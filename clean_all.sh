@@ -1,5 +1,4 @@
 #!/bin/bash
-# I hate Bash. It's ugly. I miss Powershell.
 
 pretty_print()
 {
@@ -99,7 +98,7 @@ remove_all_job_logs()
 	pretty_print "All job log files removed. Yay!"
 }
 
-remove_all_simulation_directories()
+remove_all_simulation_links_and_directories()
 {
 	pretty_print "Finding symbolic links for all simulation directories in the current folder..."
 	local simulation_links=()
