@@ -144,7 +144,7 @@ pretty_print "This script removes all GYSELA simulation directories and associat
 pretty_print "Would you like to proceed? (y/n)"
 read -r answer
 
-if [[ "$answer" != "y" ]]
+if [[ "$answer" != "y" ]] # TODO: this is dumb. what if the user types "yes", or "Yes", or "Y"? You dumb fuck.
 then
 	pretty_print "Aborting cleanup. See ya!"
 	exit 0
