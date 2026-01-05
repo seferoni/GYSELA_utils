@@ -147,11 +147,12 @@ read -r answer
 if [[ "$answer" != "y" ]] # TODO: this is dumb. what if the user types "yes", or "Yes", or "Y"? You dumb fuck.
 then
 	pretty_print "Aborting cleanup. See ya!"
-	exit 0
+	exit 1
 fi
 
-remove_all_simulation_directories
+remove_all_simulation_links_and_directories
 remove_all_input_file_copies
 remove_all_cmds
 remove_all_job_logs
 pretty_print "Cleanup complete!"
+exit 0
