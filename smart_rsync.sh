@@ -19,14 +19,6 @@ is_yes()
 	esac
 }
 
-is_no()
-{
-	case "$1" in
-		[nN]*)	return $true ;;
-		*)		return $false ;;
-	esac
-}
-
 # Bespoke helper functions.
 check_and_set_target_directory()
 {
@@ -61,17 +53,35 @@ check_and_set_target_directory()
 
 compare_metadata_and_copy()
 {
-	# TODO: need to dynamically generate exclusion lists based on detected restarts
 	local source_directory="$1"
-	local metadata_0_creationdate=$(stat -c %Y "$source_directory/sp0/rst_files/metadata.n0.h5")
-	local metadata_1_creationdate=$(stat -c %Y "$source_directory/sp0/rst_files/metadata.n1.h5")
+	local metadata_0_creationdate
+	local metadata_1_creationdate
+	local exclusion_list
+	
+	metadata_0_creationdate="$(stat -c %Y "$source_directory/sp0/rst_files/metadata.n0.h5")"
+	metadata_1_creationdate="$(stat -c %Y "$source_directory/sp0/rst_files/metadata.n1.h5")"
 
 	if [[ $metadata_0_creationdate -gt $metadata_1_creationdate ]]
 	then
 		pretty_print "n0 is newer than n1. Excluding n1 files."
+		exclusion_list=$(generate_exclusion_list "n1")
 	else
 		pretty_print "n1 is newer than n0. Excluding n0 files."
+		exclusion_list=$(generate_exclusion_list "n0")
 	fi
+
+	pretty_print "Copying files from $source_directory to $SMARTRSYNCPATH, excluding older restart data."
+	rsync -arzP "$exclusion_list" "$source_directory" "$SMARTRSYNCPATH"
+	echo "Copy complete. Buh-bye!"
+}
+
+generate_exclusion_list()
+{
+	local rst_exclusion_number="$1"
+	local exclusion_list=""
+	exclusion_list+="--exclude=metadata.${rst_exclusion_number}.h5"
+	exclusion_list+=" --exclude=.${rst_exclusion_number}.*h5"
+	echo "$exclusion_list"
 }
 
 is_eligible_for_restart_culling()
@@ -99,6 +109,7 @@ copy_files_naively()
 if [[ $# -ne 1 ]]
 then
 	pretty_print "This is a script to copy simulation data folders while excluding older restart data."
+	echo "The target directory can be specified via the environment variable SMARTRSYNCPATH."
 	echo "Usage: ./smart_rsync.sh <simulation_directory>"
 	exit 1
 fi
@@ -111,7 +122,7 @@ fi
 if is_eligible_for_restart_culling "$1"
 then
 	compare_metadata_and_copy "$1"
-	return
+	exit 0
 fi
 
 copy_files_naively "$1"
