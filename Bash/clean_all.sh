@@ -1,8 +1,22 @@
 #!/bin/bash
 
+# Basic variables.
+# Because God hates Bash and myself, true is 0 and false is 1... so as to play nice with exit codes.
+readonly true=0
+readonly false=1
+
+# Basic functions.
 pretty_print()
 {
 	printf "\n%s\n" "$1"
+}
+
+is_yes()
+{
+	case "$1" in
+		[yY]*)	return $true ;;
+		*)		return $false ;;
+	esac
 }
 
 remove_all_input_file_copies()
@@ -21,7 +35,7 @@ remove_all_input_file_copies()
 	pretty_print "Would you like them removed? (y/n)"
 	read -r answer
 
-	if [[ "$answer" != "y" ]]
+	if ! is_yes "$answer"
 	then
 		pretty_print "Skipping input file copy removal."
 		return
@@ -52,7 +66,7 @@ remove_all_cmds()
 	pretty_print "Would you like them removed? (y/n)"
 	read -r answer
 
-	if [[ "$answer" != "y" ]]
+	if ! is_yes "$answer"
 	then
 		pretty_print "Skipping command file removal."
 		return
@@ -83,7 +97,7 @@ remove_all_job_logs()
 	pretty_print "Would you like them removed? (y/n)"
 	read -r answer
 
-	if [[ "$answer" != "y" ]]
+	if ! is_yes "$answer"
 	then
 		pretty_print "Skipping log removal."
 		return
@@ -115,7 +129,7 @@ remove_all_simulation_links_and_directories()
 	pretty_print "Would you like to remove them and their associated directories? (y/n)"
 	read -r answer
 
-	if [[ "$answer" != "y" ]]
+	if ! is_yes "$answer"
 	then
 		pretty_print "Skipping simulation directory removal."
 		return
@@ -144,7 +158,7 @@ pretty_print "This script removes all GYSELA simulation directories and associat
 pretty_print "Would you like to proceed? (y/n)"
 read -r answer
 
-if [[ "$answer" != "y" ]] # TODO: this is dumb. what if the user types "yes", or "Yes", or "Y"? You dumb fuck.
+if ! is_yes "$answer"
 then
 	pretty_print "Aborting cleanup. See ya!"
 	exit 1
