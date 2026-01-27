@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# TODO: need to cull the "Vlasov Scheme" field in copies bc it is obsolete
+# TODO: retain whitespaces in fields when modifying input files
+# TODO: add defaults to echo queries to speed shit up
+# TODO: match common inputs to a dictionary
+# TODO: need to quickly validate inputs to ensure they're valid
+
 # Basic variables.
 # Because God hates Bash and myself, true is 0 and false is 1... so as to play nice with exit codes.
 readonly true=0
@@ -20,6 +26,23 @@ is_yes()
 }
 
 # Bespoke helper functions.
+cull_obsolete_entries()
+{
+	# TODO: need to cull the "Vlasov Scheme" field in copies bc it is obsolete
+	input_file="$1"
+	local patterns=(
+		"^[[:blank:]]*Vlasov Scheme[[:blank:]]*=[[:blank:]]*[^![:blank:]].*"
+	)
+
+	for pattern in "${patterns[@]}"
+	do
+		if grep -q "$pattern" "$input_file"
+		then
+			sed -i "s/$pattern/d" "$input_file"
+		fi
+	done
+}
+
 define_input_path()
 {
 	echo -n "Would you like to specify an template file path manually? (y/n)"
@@ -47,7 +70,6 @@ define_input_path()
 	return $true
 }
 
-
 set_target_directory()
 {
 	pretty_print "Please specify the absolute path of the target file."
@@ -73,6 +95,19 @@ set_target_directory()
 	return $false
 }
 
+generate_parameter_dictionary()
+{
+	declare -A parameter_dictionary
+
+	parameter_dictionary=(
+		["q"]="q_param1"
+		["tau"]="tau0"
+		["geometry"]="magnet_strategy"
+	)
+
+	echo "${parameter_dictionary[@]}"
+}
+
 generate_input_file_copy()
 {
 	pretty_print "Generating a new input file based on the template at $INPUTFILEPATH."
@@ -87,7 +122,25 @@ generate_input_file_copy()
 	rsync -arzP "$INPUTFILEPATH" "./$filename"
 	echo "New input file created: ./$filename".
 	echo "Buh-bye!"
-	modify_input_parameters $filename
+	cull_obsolete_entries "$filename"
+	modify_input_parameters "$filename"
+}
+
+match_input_to_dictionary()
+{
+	input="$1"
+	parameter_dictionary=$(generate_parameter_dictionary)
+
+	for key in "${!parameter_dictionary[@]}"
+	do	# TODO: copilot generated this, so it's probably nonsense
+		if [[ "$input" == *"$key"* ]]
+		then
+			echo "${parameter_dictionary[$key]}"
+			return $true
+		fi
+	done
+
+	return $false
 }
 
 modify_input_parameters()

@@ -48,9 +48,7 @@ copy_files()
 {
 	pretty_print "Copying files from $1 to $SMARTRSYNCPATH".
 	exclusion_list=$(generate_exclusion_list)
-	cmd="rsync -arzP $1 $SMARTRSYNCPATH"
-	echo "$cmd"
-	eval "$cmd"
+	rsync -arzP "$exclusion_list" "$1" "$SMARTRSYNCPATH"
 }
 
 generate_exclusion_list()
