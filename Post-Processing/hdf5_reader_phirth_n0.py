@@ -28,7 +28,7 @@ def fetch_phi2D_filepaths(nominal_path):
 	return sorted(h5_files);
 
 def read_hdf5_file(filepath):
-
+	# TODO: better to use xarray here.
 	h5_file = h5py.File(filepath, 'r')
 	print(f"{filepath} has been successfully resolved and opened.");
 	return h5_file["Phirth_n0"][:];
