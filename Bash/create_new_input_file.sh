@@ -4,11 +4,18 @@
 # Because God hates Bash and myself, true is 0 and false is 1... so as to play nice with exit codes.
 readonly true=0
 readonly false=1
+readonly green="\033[0;32m"
+readonly end_colour="\033[0m"
 
 # Basic functions.
 pretty_print()
 {
 	printf "\n%s\n" "$1"
+}
+
+pretty_print_query()
+{
+	pretty_print "${green}$1${end_colour}"
 }
 
 is_yes()
@@ -39,12 +46,12 @@ cull_obsolete_entries()
 define_input_path()
 {
 	local answer
-	echo -n "Would you like to specify an template file path manually? (Y/n)"
+	pretty_print_query -n "Would you like to specify an template file path manually? (Y/n)"
 	read -r answer
 
 	if [[ -z "$answer" ]]
 	then
-		pretty_print "No input received. Aborting."
+		echo "No input received. Aborting."
 		return $false
 	fi
 
@@ -56,7 +63,7 @@ define_input_path()
 
 	if [[ ! -v INPUTFILEPATH ]]
 	then
-		pretty_print "The environment variable INPUTFILEPATH is not defined. Aborting."
+		echo "The environment variable INPUTFILEPATH is not defined. Aborting."
 		return $false
 	fi
 
@@ -67,7 +74,7 @@ define_input_path()
 set_target_directory()
 {
 	local answer
-	pretty_print "Please specify the absolute path of the target file."
+	pretty_print_query "Please specify the absolute path of the target file."
 	read -r answer
 
 	if [[ -z "$answer" ]]
@@ -104,8 +111,8 @@ generate_parameter_dictionary()
 
 generate_input_file_copy()
 {
-	pretty_print "Generating a new input file based on the template at $INPUTFILEPATH."
-	echo "Please name the new input file (default: 'my_cool_input_file'):"
+	echo "Generating a new input file based on the template at $INPUTFILEPATH."
+	pretty_print_query "Please name the new input file (default: 'my_cool_input_file'):"
 	read -r filename
 
 	if [[ -z "$filename" ]]
@@ -141,7 +148,7 @@ modify_input_parameters()
 	local answer user_key parameter value 
 
 	# `basename` strips the directory path from the filename. Not strictly necessary here, but keeps the code versatile.
-	pretty_print "Modify input parameters in $(basename "$input_file") now? (Y/n)"
+	pretty_print_query "Modify input parameters in $(basename "$input_file") now? (Y/n)"
 	read -r answer
 
 	if ! is_yes "$answer"
@@ -178,7 +185,7 @@ queue_for_simulation()
 {
 	local input_file="$1"
 	local answer
-	pretty_print "Would you like to queue this simulation file as a GYSELA job?"
+	pretty_print_query "Would you like to queue this simulation file as a GYSELA job?"
 	read -r answer
 
 	if ! is_yes answer
