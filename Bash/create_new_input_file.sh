@@ -34,13 +34,15 @@ cull_obsolete_entries()
 		"^[[:blank:]]*Vlasov Scheme[[:blank:]]*=[[:blank:]]*[^![:blank:]].*"
 	)
 
+	pretty_print "Culling obsolete entries..."
 	for pattern in "${patterns[@]}"
 	do
 		if grep -q "$pattern" "$input_file"
 		then
-			sed -i "s|$pattern|d" "$input_file" # TODO: will this actually remove the line?
+			sed -i "/$pattern/d" "$input_file"
 		fi
 	done
+	echo "Culled all obsolete entries."
 }
 
 define_input_path()
@@ -185,7 +187,7 @@ queue_for_simulation()
 {
 	local input_file="$1"
 	local answer
-	pretty_print_query "Would you like to queue this simulation file as a GYSELA job?"
+	pretty_print_query "Would you like to queue this simulation file as a GYSELA job? (Y/n)"
 	read -r answer
 
 	if ! is_yes answer
@@ -196,6 +198,7 @@ queue_for_simulation()
 
 	./subgys "$input_file"
 	echo "Queueing $input_file as a GYSELA job."
+	return $true
 }
 
 # Main script logic.

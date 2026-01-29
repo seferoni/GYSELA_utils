@@ -1,4 +1,5 @@
 import xarray as xr
+from pathlib import Path
 
 def fetch_data_from_h5(filepath):
 
@@ -9,3 +10,29 @@ def fetch_data_from_h5(filepath):
 	# Discard size-1 dimensions.
 	dataset = dataset.squeeze();
 	return dataset;
+
+def fetch_phi2D_filepaths(nominal_path):
+
+	directory_path = Path(nominal_path);
+
+	if not directory_path.is_dir(directory_path):
+		print(f"The given directory '{nominal_path}' could not be resolved.");
+		return [];
+
+	h5_files = [file.resolve() for file in directory_path.glob("Phi2D_d*.h5")];
+	return sorted(h5_files);
+
+def fetch_data_from_directory(nominal_path):
+	
+	compiled_data = [];
+	h5_files = fetch_phi2D_filepaths(nominal_path);
+
+	if (len(h5_files) == 0):
+		print(f"Error: no h5 files could be retrieved from {nominal_path}.");
+		return compiled_data;
+
+	for h5_file in h5_files:
+		data = fetch_data_from_h5(h5_file);
+		compiled_data.append(data);
+
+	return compiled_data;
