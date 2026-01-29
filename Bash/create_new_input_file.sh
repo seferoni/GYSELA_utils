@@ -1,11 +1,5 @@
 #!/bin/bash
 
-# TODO: need to cull the "Vlasov Scheme" field in copies bc it is obsolete
-# TODO: retain whitespaces in fields when modifying input files
-# TODO: add defaults to echo queries to speed shit up
-# TODO: match common inputs to a dictionary
-# TODO: need to quickly validate inputs to ensure they're valid
-
 # Basic variables.
 # Because God hates Bash and myself, true is 0 and false is 1... so as to play nice with exit codes.
 readonly true=0
@@ -20,7 +14,7 @@ pretty_print()
 is_yes()
 {
 	case "$1" in
-		[yY]*)	return $true ;;
+		[yY]*|"")	return $true ;;
 		*)		return $false ;;
 	esac
 }
@@ -28,8 +22,7 @@ is_yes()
 # Bespoke helper functions.
 cull_obsolete_entries()
 {
-	# TODO: need to cull the "Vlasov Scheme" field in copies bc it is obsolete
-	input_file="$1"
+	local input_file="$1"
 	local patterns=(
 		"^[[:blank:]]*Vlasov Scheme[[:blank:]]*=[[:blank:]]*[^![:blank:]].*"
 	)
@@ -38,14 +31,15 @@ cull_obsolete_entries()
 	do
 		if grep -q "$pattern" "$input_file"
 		then
-			sed -i "s/$pattern/d" "$input_file"
+			sed -i "s|$pattern|d" "$input_file" # TODO: will this actually remove the line?
 		fi
 	done
 }
 
 define_input_path()
 {
-	echo -n "Would you like to specify an template file path manually? (y/n)"
+	local answer
+	echo -n "Would you like to specify an template file path manually? (Y/n)"
 	read -r answer
 
 	if [[ -z "$answer" ]]
@@ -72,6 +66,7 @@ define_input_path()
 
 set_target_directory()
 {
+	local answer
 	pretty_print "Please specify the absolute path of the target file."
 	read -r answer
 
@@ -83,7 +78,7 @@ set_target_directory()
 
 	export INPUTFILEPATH="$answer"
 	echo "Target file defined as $INPUTFILEPATH. Note that this is only set for the current session."
-	echo -n "Would you like to proceed? (y/n)"
+	echo -n "Would you like to proceed? (Y/n)"
 	read -r answer
 
 	if is_yes "$answer"
@@ -97,15 +92,14 @@ set_target_directory()
 
 generate_parameter_dictionary()
 {
-	declare -A parameter_dictionary
-
-	parameter_dictionary=(
+	# The -A flag defines an associative array, and the `-g` flag makes it a global variable.
+	declare -gA parameter_dictionary=(
+		["restarts"]="NB_RESTART"
+		["time"]="TIME"
 		["q"]="q_param1"
 		["tau"]="tau0"
 		["geometry"]="magnet_strategy"
 	)
-
-	echo "${parameter_dictionary[@]}"
 }
 
 generate_input_file_copy()
@@ -121,32 +115,33 @@ generate_input_file_copy()
 
 	rsync -arzP "$INPUTFILEPATH" "./$filename"
 	echo "New input file created: ./$filename".
-	echo "Buh-bye!"
 	cull_obsolete_entries "$filename"
 	modify_input_parameters "$filename"
+	queue_for_simulation "$filename"
 }
 
 match_input_to_dictionary()
 {
-	input="$1"
-	parameter_dictionary=$(generate_parameter_dictionary)
+	local input="$1"
+	generate_parameter_dictionary
 
-	for key in "${!parameter_dictionary[@]}"
-	do	# TODO: copilot generated this, so it's probably nonsense
-		if [[ "$input" == *"$key"* ]]
-		then
-			echo "${parameter_dictionary[$key]}"
-			return $true
-		fi
-	done
+	if [[ -v "parameter_dictionary[$input]" ]]
+	then 
+		echo "${parameter_dictionary[$key]}"
+		return $true
+	fi
 
+	echo "$input"
 	return $false
 }
 
 modify_input_parameters()
 {
-	input_file="$1"
-	pretty_print "Would you like to modify any (additional) input parameters in $input_file now? (y/n)"
+	local input_file="$1"
+	local answer user_key parameter value 
+
+	# `basename` strips the directory path from the filename. Not strictly necessary here, but keeps the code versatile.
+	pretty_print "Modify input parameters in $(basename "$input_file") now? (Y/n)"
 	read -r answer
 
 	if ! is_yes "$answer"
@@ -155,24 +150,52 @@ modify_input_parameters()
 		return $true
 	fi
 
-	local parameter
-	local value
-	echo "Please specify the parameter you would like to modify (as it appears in the input file):"
-	read -r parameter
-	echo "Please specify the new value for '$parameter':"
+	echo "Specify the parameter (either a recognised alias or an exact name):"
+	read -r user_key
+
+	parameter=$(match_input_to_dictionary "$user_key")
+
+	echo "Specify the new value for '$parameter':"
 	read -r value
 
-	local original_pattern="^[[:blank:]]*${parameter}[[:blank:]]*=[[:blank:]]*[^![:blank:]].*"
-	local new_line="${parameter} = ${value} ! Modified by create_new_input_file.sh!"
-	sed -i -e "s/$original_pattern/$new_line/" "$input_file"
-	echo "Parameter '$parameter' updated to value '$value' in file '$input_file'."
+	local original_pattern="^([[:blank:]]*${parameter}[[:blank:]]*=[[:blank:]]*)[^![:blank:]].*"
+	local new_line="${parameter} = ${value} ! Modified by create_new_input_file.sh."
+
+	# Uppercase `E` permits extended regex.
+	if grep -qE "$original_pattern" "$input_file"
+	then
+		# NB: `\` and `|` are equivalent delimiter characters.
+		sed -i -e "s|${original_pattern}|\1{$new_line}|" "$input_file"
+		echo "'$parameter' has been updated to '$value'."
+	else 
+		echo "Could not find specified parameter '$parameter'. Skipping."
+	fi
+
 	modify_input_parameters "$input_file"
+}
+
+queue_for_simulation()
+{
+	local input_file="$1"
+	local answer
+	pretty_print "Would you like to queue this simulation file as a GYSELA job?"
+	read -r answer
+
+	if ! is_yes answer
+	then
+		echo "Skipping simulation file queueing."
+		return $true
+	fi
+
+	./subgys "$input_file"
+	echo "Queueing $input_file as a GYSELA job."
 }
 
 # Main script logic.
 if [[ $# -ne 0 ]]
 then
 	pretty_print "This is a script to quickly create a new input file for GYSELA simulations within this script's directory."
+	echo "This script should be placed within the \wk directory."
 	echo "The target file can be specified via the environment variable INPUTFILEPATH."
 	exit 1
 fi

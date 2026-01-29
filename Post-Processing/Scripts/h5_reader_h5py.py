@@ -1,7 +1,6 @@
 import sys;
 import h5py;
 import numpy as np;
-import glob;
 from pathlib import Path;
 
 # Auxiliary functions.
@@ -28,13 +27,13 @@ def fetch_phi2D_filepaths(nominal_path):
 	return sorted(h5_files);
 
 def read_hdf5_file(filepath):
-	# TODO: better to use xarray here.
+
 	h5_file = h5py.File(filepath, 'r')
 	print(f"{filepath} has been successfully resolved and opened.");
 	return h5_file["Phirth_n0"][:];
 
 # Main script logic.
-def main():
+def fetch_phi2D_data():
 
 	if len(sys.argv) != 2:
 		print("Usage: python hdf5_reader.py <absolute_path_to_hdf5_file>");
@@ -49,7 +48,4 @@ def main():
 		print("Aborting.");
 		sys.exit(1);
 
-	phi2D_data = compile_phi2D_data(h5_files);
-	# TODO: logic here
-
-main();
+	return compile_phi2D_data(h5_files);
