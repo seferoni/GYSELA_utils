@@ -1,6 +1,18 @@
 import xarray as xr
 from pathlib import Path
 
+def compile_data_from_directory(data_key, nominal_path, to_numpy = False):
+
+	dataset_list = fetch_data_from_directory(nominal_path);
+	
+	# The onus for input validation is on the user.
+	data_arrays = [dataset[data_key] for dataset in dataset_list];
+
+	if to_numpy:
+		data_arrays = [data_array.to_numpy() for data_array in data_arrays];
+
+	return data_arrays;
+
 def fetch_data_from_h5(filepath):
 
 	dataset = xr.open_dataset(filepath);
@@ -15,7 +27,7 @@ def fetch_phi2D_filepaths(nominal_path):
 
 	directory_path = Path(nominal_path);
 
-	if not directory_path.is_dir(directory_path):
+	if not directory_path.is_dir():
 		print(f"The given directory '{nominal_path}' could not be resolved.");
 		return [];
 

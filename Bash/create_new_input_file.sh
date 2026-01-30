@@ -10,12 +10,12 @@ readonly end_colour="\033[0m"
 # Basic functions.
 pretty_print()
 {
-	printf "\n%s\n" "$1"
+	printf "\n%b\n" "$1"
 }
 
 pretty_print_query()
 {
-	pretty_print "${green}$1${end_colour}"
+	printf "\n%b" "${green}$1${end_colour}"
 }
 
 is_yes()
@@ -48,14 +48,8 @@ cull_obsolete_entries()
 define_input_path()
 {
 	local answer
-	pretty_print_query -n "Would you like to specify an template file path manually? (Y/n)"
+	pretty_print_query "Would you like to specify an template file path manually? (Y/n)"
 	read -r answer
-
-	if [[ -z "$answer" ]]
-	then
-		echo "No input received. Aborting."
-		return $false
-	fi
 
 	if is_yes "$answer"
 	then 
@@ -104,6 +98,7 @@ generate_parameter_dictionary()
 	# The -A flag defines an associative array, and the `-g` flag makes it a global variable.
 	declare -gA parameter_dictionary=(
 		["restarts"]="NB_RESTART"
+		["jobname"]="JOBNAME"
 		["time"]="TIME"
 		["q"]="q_param1"
 		["tau"]="tau0"
@@ -136,7 +131,7 @@ match_input_to_dictionary()
 
 	if [[ -v "parameter_dictionary[$input]" ]]
 	then 
-		echo "${parameter_dictionary[$key]}"
+		echo "${parameter_dictionary[$input]}"
 		return $true
 	fi
 
@@ -168,13 +163,12 @@ modify_input_parameters()
 	read -r value
 
 	local original_pattern="^([[:blank:]]*${parameter}[[:blank:]]*=[[:blank:]]*)[^![:blank:]].*"
-	local new_line="${parameter} = ${value} ! Modified by create_new_input_file.sh."
 
 	# Uppercase `E` permits extended regex.
 	if grep -qE "$original_pattern" "$input_file"
 	then
 		# NB: `\` and `|` are equivalent delimiter characters.
-		sed -i -e "s|${original_pattern}|\1{$new_line}|" "$input_file"
+		sed -i -E "s|${original_pattern}|\1$value ! Modified by create_new_input_file.sh.|" "$input_file"
 		echo "'$parameter' has been updated to '$value'."
 	else 
 		echo "Could not find specified parameter '$parameter'. Skipping."
@@ -190,14 +184,14 @@ queue_for_simulation()
 	pretty_print_query "Would you like to queue this simulation file as a GYSELA job? (Y/n)"
 	read -r answer
 
-	if ! is_yes answer
+	if ! is_yes "$answer"
 	then
 		echo "Skipping simulation file queueing."
 		return $true
 	fi
 
-	./subgys "$input_file"
 	echo "Queueing $input_file as a GYSELA job."
+	./subgys "$input_file"
 	return $true
 }
 
