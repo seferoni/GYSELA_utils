@@ -9,11 +9,20 @@ from scipy.fft import fft, fftfreq
 
 # The variables below are nominally private - not to be altered during run-time!
 # Sourced from GAM_analytical.py.
-private_minor_radius_gys = 160;
-private_rhostar_gys = 1./float(private_minor_radius_gys);
-private_aspect_ratio_gys = 0.5;
-private_normalisation_coeff_gys = private_aspect_ratio_gys/(private_rhostar_gys * np.sqrt(2.));
-
+minor_radius = 0.13;
+major_radius = 1.3;
+electron_volt = 1.602176634e-19; # In joules.
+ion_temperature = 1; # In keV.
+electron_temperature = 1; # In keV.
+ion_temperature_joules = ion_temperature * 1000 * electron_volt;
+electron_temperature_joules = electron_temperature  * 1000 * electron_volt;
+proton_mass = 1.67262192369e-27;
+ion_mass = 2.0 * proton_mass;
+minor_radius_gys = 160;
+rhostar_gys = 1./float(minor_radius_gys);
+aspect_ratio_gys = 0.5;
+thermal_velocity = np.sqrt(ion_temperature_joules/ion_mass);
+normalisation_coeff_gys = aspect_ratio_gys/(rhostar_gys * np.sqrt(2.));
 
 # -------------------------------------------------------------------
 # -------- Radial propagation/PSD & FFT helper functions. -----------
@@ -29,7 +38,7 @@ def generate_poloidally_averaged_time_series(phirth_list):
 	hovmoller_matrix = xr.concat(radial_strips, dim = "time");
 	return hovmoller_matrix;
 
-def map_power_spectrum(hovmoller_matrix, radial_index, time_step):
+def map_power_spectrum(hovmoller_matrix, radial_index, time_step, padding_factor = 5):
 	# Slice at radial index to isolate a strong signal.
 	signal = hovmoller_matrix.sel(r = radial_index);
 	signal_steps = len(signal);
@@ -39,18 +48,21 @@ def map_power_spectrum(hovmoller_matrix, radial_index, time_step):
 	signal = (signal - np.mean(signal)) * np.hanning(signal_steps);
 
 	# Fourier transform from time-domain to frequency-domain.
-	signal_fourier = np.array(fft(signal));
+	# Pad signal with 0s to improve resolution.
+	padded_signal_steps = signal_steps * padding_factor;
+	signal_fourier = np.array(fft(signal, n = padded_signal_steps));
 	power_spectrum_density = np.abs(signal_fourier) ** 2;
 	
 	# Generate actual frequency data. TODO: what's going on here?
-	frequencies = fftfreq(signal_steps, time_step.flatten()[0]);
+	frequencies = fftfreq(padded_signal_steps, time_step);
 
 	# Preserve positive frequencies. TODO: why?
 	mask = frequencies > 0;
 	return frequencies[mask], power_spectrum_density[mask];
 
-def convert_to_real_time(time_step):
-	# TODO:
+def convert_to_real_frequency(frequency_term):
+
+	return frequency_term * normalisation_coeff_gys * thermal_velocity/major_radius;
 
 # -------------------------------------------------------------------
 # ------------------- Mesh grid generation. -------------------------
