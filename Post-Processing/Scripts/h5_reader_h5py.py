@@ -19,7 +19,7 @@ def fetch_phi2D_filepaths(nominal_path):
 
 	directory_path = Path(nominal_path);
 
-	if not directory_path.is_dir(directory_path):
+	if not directory_path.is_dir():
 		print(f"Error: The given directory '{nominal_path}' could not be resolved.");
 		return [];
 
@@ -27,12 +27,11 @@ def fetch_phi2D_filepaths(nominal_path):
 	return sorted(h5_files);
 
 def read_hdf5_file(filepath):
-
+	# TODO: implementation incomplete.
 	h5_file = h5py.File(filepath, 'r')
 	print(f"{filepath} has been successfully resolved and opened.");
 	return h5_file["Phirth_n0"][:];
 
-# Main script logic.
 def fetch_phi2D_data():
 
 	if len(sys.argv) != 2:
