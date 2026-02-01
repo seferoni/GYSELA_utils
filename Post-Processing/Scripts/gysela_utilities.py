@@ -2,6 +2,7 @@
 import numpy as np;
 import xarray as xr;
 from scipy.fft import fft, fftfreq
+from scipy import signal;
 
 # -------------------------------------------------------------------
 # --------------------------Parameters. -----------------------------
@@ -9,20 +10,35 @@ from scipy.fft import fft, fftfreq
 
 # The variables below are nominally private - not to be altered during run-time!
 # Sourced from GAM_analytical.py.
-minor_radius = 0.13;
-major_radius = 1.3;
-electron_volt = 1.602176634e-19; # In joules.
-ion_temperature = 1; # In keV.
-electron_temperature = 1; # In keV.
-ion_temperature_joules = ion_temperature * 1000 * electron_volt;
-electron_temperature_joules = electron_temperature  * 1000 * electron_volt;
-proton_mass = 1.67262192369e-27;
-ion_mass = 2.0 * proton_mass;
-minor_radius_gys = 160;
-rhostar_gys = 1./float(minor_radius_gys);
-aspect_ratio_gys = 0.5;
-thermal_velocity = np.sqrt(ion_temperature_joules/ion_mass);
-normalisation_coeff_gys = aspect_ratio_gys/(rhostar_gys * np.sqrt(2.));
+
+physical_constants = {
+	"electron_volt" : 1.602176634e-19, # In Joules.
+	"proton_mass" : 1.67262192369e-27,
+};
+
+geometry = {
+	"minor_radius" : 0.13,
+	"major_radius" : 1.3,
+	"minor_radius_gys" : 160,
+	"aspect_ratio_gys" : 0.5,
+};
+
+simulation_parameters_raw = {
+	"ion_temperature" : 1,
+	"electron_temperature" : 1,
+};
+
+simulation_parameters = {
+	"ion_temperature_joules" : simulation_parameters_raw["ion_temperature"] * 1000. * physical_constants["electron_volt"],
+	"electron_temperature_joules" : simulation_parameters_raw["electron_temperature"]  * 1000. * physical_constants["electron_volt"],
+	"ion_mass" : 2.0 * physical_constants["proton_mass"], # Presuming deuterium.
+	"rhostar_gys" : 1./float(geometry["minor_radius_gys"]),
+};
+
+normalisation_parameters = {
+	"thermal_velocity" : np.sqrt(simulation_parameters["ion_temperature_joules"]/simulation_parameters["ion_mass"]),
+	"normalisation_coeff_gys" : geometry["aspect_ratio_gys"]/(simulation_parameters["rhostar_gys"] * np.sqrt(2.))
+};
 
 # -------------------------------------------------------------------
 # -------- Radial propagation/PSD & FFT helper functions. -----------
@@ -62,7 +78,18 @@ def map_power_spectrum(hovmoller_matrix, radial_index, time_step, padding_factor
 
 def convert_to_real_frequency(frequency_term):
 
-	return frequency_term * normalisation_coeff_gys * thermal_velocity/major_radius;
+	dimensionless_normalisation_coeff = normalisation_parameters["normalisation_coeff_gys"];
+	real_normalisation_coeff = normalisation_parameters["thermal_velocity"]/geometry["major_radius"];
+	return frequency_term * dimensionless_normalisation_coeff * real_normalisation_coeff;
+
+def isolate_GAM_peak_index(power_spectrum_density):
+
+	# NB: `peak_indices` corresponds to peaks in `power_spectrum_density`.
+	# Prominence is calibrated to ensure a ZFZF power spike, if present, is ignored.
+	peak_indices, _ = signal.find_peaks(power_spectrum_density, prominence = power_spectrum_density.max() * 0.1);
+	peaks = power_spectrum_density[peak_indices];
+	GAM_peak_index = peak_indices[np.argmax(peaks)];
+	return GAM_peak_index;
 
 # -------------------------------------------------------------------
 # ------------------- Mesh grid generation. -------------------------
