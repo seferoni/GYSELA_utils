@@ -1,7 +1,7 @@
 # Imports.
 import numpy as np;
 import xarray as xr;
-from scipy.fft import fft, fftfreq
+from scipy.fft import fft, fftfreq;
 from scipy import signal;
 
 # -------------------------------------------------------------------
