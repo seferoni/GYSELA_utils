@@ -15,7 +15,7 @@ def compile_data_from_directory(data_key, nominal_path, to_numpy = False):
 
 def fetch_data_from_h5(filepath):
 
-	dataset = xr.open_dataset(filepath);
+	dataset = xr.open_dataset(filepath, engine = "h5netcdf");
 	# NB: As per the input file, Nr = 63, Ntheta = 128, Nphi = 8.
 	# We match each `phony_dim` by comparing array sizes.
 	dataset = dataset.rename(phony_dim_0 = "zeta", phony_dim_1 = "r", phony_dim_2 = "theta").load();

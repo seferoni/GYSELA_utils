@@ -3,6 +3,7 @@ import numpy as np;
 import xarray as xr;
 from scipy.fft import fft, fftfreq;
 from scipy import signal;
+from scipy.interpolate import interp1d;
 
 # -------------------------------------------------------------------
 # --------------------------Parameters. -----------------------------
@@ -81,6 +82,21 @@ def convert_to_real_frequency(frequency_term):
 	dimensionless_normalisation_coeff = normalisation_parameters["normalisation_coeff_gys"];
 	real_normalisation_coeff = normalisation_parameters["thermal_velocity"]/geometry["major_radius"];
 	return frequency_term * dimensionless_normalisation_coeff * real_normalisation_coeff;
+
+def generate_residual_envelope(radial_time_series):
+
+	# Isolate last one hundred entries in the time series as the residual.
+	residual_level = np.mean(radial_time_series[-100:]);
+	
+	# Isolate peaks.
+	peak_indices, _ = signal.find_peaks(radial_time_series, distance = 20);
+	peaks = radial_time_series[peak_indices];
+	peak_times = np.arange(len(radial_time_series));
+
+	# Interpolate envelope.
+	envelope = interp1d(peak_indices, peaks, kind = "linear", bounds_error = False, fill_value = (peaks[0], peaks[-1]))(peak_times);
+	return envelope, residual_level;
+
 
 def isolate_GAM_peak_index(power_spectrum_density):
 
