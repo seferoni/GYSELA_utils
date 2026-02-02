@@ -45,16 +45,6 @@ normalisation_parameters = {
 # -------- Radial propagation/PSD & FFT helper functions. -----------
 # -------------------------------------------------------------------
 
-def generate_poloidally_averaged_time_series(phirth_list):
-
-	# Poloidal averaging, equivalent in function to flux-surface averaging. This isolates the m = 0 zonal component.
-	# Intuitively speaking, this also 'truncates' the circular geometry into one-dimensional radial strips.
-	radial_strips = [phirth_xarray.mean(dim = "theta") for phirth_xarray in phirth_list];
-
-	# The following produces a two-dimensional x-array of shape (time, radial coordinate).
-	hovmoller_matrix = xr.concat(radial_strips, dim = "time");
-	return hovmoller_matrix;
-
 def map_power_spectrum(hovmoller_matrix, radial_index, time_step, padding_factor = 5):
 	# Slice at radial index to isolate a strong signal.
 	signal = hovmoller_matrix.sel(r = radial_index);
@@ -97,7 +87,6 @@ def generate_residual_envelope(radial_time_series):
 	envelope = interp1d(peak_indices, peaks, kind = "linear", bounds_error = False, fill_value = (peaks[0], peaks[-1]))(peak_times);
 	return envelope, residual_level;
 
-
 def isolate_GAM_peak_index(power_spectrum_density):
 
 	# NB: `peak_indices` corresponds to peaks in `power_spectrum_density`.
@@ -133,3 +122,27 @@ def generate_xy_grid(phi2D_dataset):
 	x = r_coords * np.cos(theta_coords);
 	y = r_coords * np.sin(theta_coords);
 	return x, y;
+
+# -------------------------------------------------------------------
+# ------------------- Auxiliary methods. ----------------------------
+# -------------------------------------------------------------------
+
+def isolate_m1_component(phirth_xarray):
+
+	theta = np.linspace(0, 2 * np.pi, len(phirth_xarray.theta));
+	
+	# Take note that the m = 1 can be isolated by projecting phi unto sin(theta).
+	# This is permitted due to Fourier decomposition & orthogonality properties.
+	phi_m1 = (phirth_xarray * np.sin(theta)[:, None]).mean(dim = "theta");
+	return phi_m1;
+
+def generate_poloidally_averaged_time_series(phirth_list, m1 = False):
+
+	# Poloidal averaging, equivalent in function to flux-surface averaging. This isolates the m = 0 zonal component.
+	# Intuitively speaking, this also 'truncates' the circular geometry into one-dimensional radial strips.
+	operation = lambda entry : entry.mean(dim = "theta") if not m1 else isolate_m1_component(entry);
+	radial_strips = [operation(phirth_xarray) for phirth_xarray in phirth_list];
+
+	# The following produces a two-dimensional x-array of shape (time, radial coordinate).
+	time_series = xr.concat(radial_strips, dim = "time");
+	return time_series;
