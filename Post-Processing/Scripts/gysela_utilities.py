@@ -45,13 +45,13 @@ normalisation_parameters = {
 # -------- Radial propagation/PSD & FFT helper functions. -----------
 # -------------------------------------------------------------------
 
-def map_power_spectrum(hovmoller_matrix, radial_index, time_step, padding_factor = 5):
+def map_power_spectrum(time_series, radial_index, time_step, padding_factor = 5):
 	# Slice at radial index to isolate a strong signal.
-	signal = hovmoller_matrix.sel(r = radial_index);
+	signal = time_series.sel(r = radial_index);
 	signal_steps = len(signal);
 
 	# Isolate the GAM signal from the stationary ZF.
-	# Apply Hanning window to prevent spectral leakage.
+	# Apply Hanning window to mitigate spectral leakage.
 	signal = (signal - np.mean(signal)) * np.hanning(signal_steps);
 
 	# Fourier transform from time-domain to frequency-domain.
@@ -60,10 +60,10 @@ def map_power_spectrum(hovmoller_matrix, radial_index, time_step, padding_factor
 	signal_fourier = np.array(fft(signal, n = padded_signal_steps));
 	power_spectrum_density = np.abs(signal_fourier) ** 2;
 	
-	# Generate actual frequency data. TODO: what's going on here?
+	# Generate actual frequency data.
 	frequencies = fftfreq(padded_signal_steps, time_step);
 
-	# Preserve positive frequencies. TODO: why?
+	# Preserve positive frequencies.
 	mask = frequencies > 0;
 	return frequencies[mask], power_spectrum_density[mask];
 
