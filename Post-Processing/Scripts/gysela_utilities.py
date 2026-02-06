@@ -1,9 +1,9 @@
 # Imports.
 import numpy as np;
 import xarray as xr;
-from scipy.fft import fft, fftfreq;
 from scipy import signal;
 from scipy.interpolate import interp1d;
+from scipy.fft import fft, fftfreq;
 
 # -------------------------------------------------------------------
 # --------------------------Parameters. -----------------------------
@@ -46,6 +46,7 @@ normalisation_parameters = {
 # -------------------------------------------------------------------
 
 def map_power_spectrum(time_series, radial_index, time_step, padding_factor = 5):
+
 	# Slice at radial index to isolate a strong signal.
 	signal = time_series.sel(r = radial_index);
 	signal_steps = len(signal);
@@ -101,6 +102,7 @@ def isolate_GAM_peak_index(power_spectrum_density):
 # -------------------------------------------------------------------
 
 def convert_to_cartesian(r, theta):
+
 	# Standard convention.
 	x = r * np.cos(theta);
 	y = r * np.sin(theta);

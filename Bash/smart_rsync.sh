@@ -4,51 +4,34 @@
 # Because God hates Bash and myself, true is 0 and false is 1... so as to play nice with exit codes.
 readonly true=0
 readonly false=1
+readonly green="\033[0;32m"
+readonly end_colour="\033[0m"
 
 # Basic functions.
 pretty_print()
 {
-	printf "\n%s\n" "$1"
+	printf "\n%b\n" "$1"
+}
+
+pretty_print_query()
+{
+	printf "\n%b" "${green}$1${end_colour}"
 }
 
 is_yes()
 {
 	case "$1" in
-		[yY]*)	return $true ;;
+		[yY]*|"")	return $true ;;
 		*)		return $false ;;
 	esac
 }
 
 # Bespoke helper functions.
-check_and_set_target_directory()
-{
-	if [[ ! -v SMARTRSYNCPATH ]]
-	then 
-		pretty_print "The environment variable SMARTRSYNCPATH is not defined. Please either define it or specify a target directory."
-		echo -n "Would you like to specify a target directory now? (y/n)"
-		read -r answer
-
-		if is_yes "$answer"
-		then 
-			pretty_print "Please specify the target directory:"
-			read -r answer
-			export SMARTRSYNCPATH="$answer"
-			pretty_print "Target directory defined as $SMARTRSYNCPATH. Note that this is only set for the current session."
-			return $true
-		fi
-
-		pretty_print "Aborting copy. Smell ya later, nerd."
-		return $false
-	fi
-
-	return $true
-}
-
 copy_files()
 {
-	pretty_print "Copying files from $1 to $SMARTRSYNCPATH".
+	pretty_print "Copying files from $1 to $2".
 	exclusion_list=$(generate_exclusion_list)
-	rsync -arzP "$exclusion_list" "$1" "$SMARTRSYNCPATH"
+	rsync -arzP "$exclusion_list" "$1" "$2";
 }
 
 generate_exclusion_list()
@@ -58,18 +41,13 @@ generate_exclusion_list()
 }
 
 # Main script logic.
-if [[ $# -ne 1 ]]
+if [[ $# -ne 2 ]]
 then
 	pretty_print "This is a script to copy simulation data folders while excluding restart data."
 	echo "The target directory can be specified via the environment variable SMARTRSYNCPATH."
-	echo "Usage: ./smart_rsync.sh <simulation_directory>"
+	echo "Usage: ./smart_rsync.sh <simulation_directory> <target_directory>"
 	exit 1
 fi
 
-if ! check_and_set_target_directory
-then
-	exit 1
-fi
-
-copy_files "$1"
+copy_files "$1" "$2"
 exit 0

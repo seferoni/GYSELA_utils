@@ -1,0 +1,145 @@
+#******************************************
+# job parameters
+#******************************************
+NB_RESTART   = 0
+TIME         = 02:00:00
+MACHINE_FILE = machinefile_2thread
+JOBNAME      = A32_dt2_test
+
+NSPECIES = 1
+NPROC_R  = 2
+NPROC_TH = 4
+NPROC_MU = 1
+NTHREAD  = 8
+
+ns0_sp0_filename = ns0_sp0_test.dat
+ns0_sp1_filename = ns0_sp1_test.dat
+Ts0_sp0_filename = Ts0_sp0_test.dat
+Ts0_sp1_filename = Ts0_sp1_test.dat
+q_filename       = safety_factor_test.dat
+ripple_filename  = ripple_constant.h5
+
+#******************************************
+# gysela input datas
+#******************************************
+&PARALLEL
+  Nspecies     = $NSPECIES
+  Nbproc_r     = $NPROC_R
+  Nbproc_theta = $NPROC_TH
+  Nbproc_mu    = $NPROC_MU
+  Nbthread     = $NTHREAD
+/
+
+&MESH
+  Nr                  = 63
+  Ntheta              = 128
+  Nphi                = 32
+  Nvpar               = 47
+  Nmu                 = $((NPROC_MU-1)) 
+  minor_radius        = 32.
+  rhomin              = 0.2
+  rhomax              = 0.8
+  Ltheta              = 6.283185307179586476925286766559005768394
+  Lphi                = 6.283185307179586476925286766559005768394
+  aspect_ratio        = 3.
+  nb_vth0             = 6.5
+  Lmu                 = 0.
+  mumin               = 0.,
+/
+
+&EQUIL
+! The possible choices for the equilibrium distribution function are:
+!   1 = "MAXWELLIAN"[default]
+!   2 = "ENERGETIC_PARTICLES"
+  fequilibrium_type          = 1
+  tau0                       = 1.
+  A0                         = 1.
+  Z0                         = 1.
+  As                         = 1.
+  Zs                         = 1.
+  species_frac               = 1.
+  read_ns0                   = .false.
+  read_Ts0                   = .false.
+  read_q                     = .false.
+  profile_choice             = 1
+  rpeak                      = 0.5     
+  kappa_ns0                  = 4.
+  kappa_Ts0                  = 27.
+  deltar_ns0                 = 0.08
+  deltar_Ts0                 = 0.08
+  Vpars0                     = 0.
+  q_profile                  = 2
+  q_param1                   = 0.854
+  q_param2                   = 2.184
+  q_param3                   = 2.8
+  q_param4                   = 1.
+  magnet_strategy            = "SLAB"
+  magnetic_drift             = .false.
+  perturb_amplitude          = 0.001
+  perturb_choice             = 2
+  m                          = 16
+  n                          = 8
+  gyroaverage                = .true.
+  TF_ripple                  = .false.
+  N_ripple                   = 0,
+/
+
+&COLLISION_OPERATOR
+  collision_strategy = "NONE"  ! ("DEFAULT", "NONE", "GENERAL")
+  nustar          = 0.0
+  coll_nbstep     = 1,
+/
+  
+&BUFFER_REGION
+  coef_diffr       = 0.0
+  coef_diffth      = 0.0
+  buffer_asymmetry = .false.
+  buffer_location  = 0.1
+  buffer_stiffness = 0.01,
+/
+
+&ALGORITHM
+  Vlasov_scheme = "BSL"
+  aligned_strategy = "NONE"
+  FFTpotential_filter        = 0
+  FFTpotential_filter_deltam = 0.
+  deltat        = 2.
+  nbiter        = 1040
+  dt_diag       = 32.,
+/
+
+&SOURCE
+  flux_driven  = .false.
+  heat_source  = .false.
+  heat_version = 0
+  Sce0         = 0.01
+  TS           = 1.
+  rhoS         = 0.1
+  LS           = 0.01,
+/
+
+&TEST
+  !--> Tests for general numerics
+  !--> Tests for QN solver
+  solve_QN             = .true.
+  !--> Tests for RHS of Boltzmann equation
+  RHS_only             = .false.
+  !--> Tests with simplified physics
+  BstareqB             = .true.
+  single_m             = .false.
+  single_n             = .false.
+  Rosenbluth_Hinton    = .false.,
+/
+
+&OUTPUT
+  integration_CS       = .false.
+  diag_level           = 4
+  Phi3D_saving         = .false.
+  Moments3D_saving     = .false.
+  fluxes3D_GC_saving   = .false.
+  f5D_saving           = .false.
+  Phi3D_dt_diag        = 800.
+  Moments3D_dt_diag    = 8000.
+  fluxes3D_GC_dt_diag  = 8000.
+  f5D_dt_diag          = 8000.,
+/
