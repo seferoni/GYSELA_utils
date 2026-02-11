@@ -1,5 +1,6 @@
 #!/bin/bash
-# TODO:
+# TODO: need to figure out overall process flow. shouldn't be too diff from the single file variant
+
 # Basic variables.
 # Because God hates Bash and myself, true is 0 and false is 1... so as to play nice with exit codes.
 readonly true=0
@@ -45,6 +46,28 @@ cull_obsolete_entries()
 	echo "Culled all obsolete entries."
 }
 
+define_input_path()
+{
+	local answer
+	pretty_print_query "Would you like to specify an template file path manually? (Y/n)"
+	read -r answer
+
+	if is_yes "$answer"
+	then 
+		set_target_directory
+		return $? # Returns the last retained exit code.
+	fi
+
+	if [[ ! -v BATCHINPUTFILEPATH ]]
+	then
+		echo "The environment variable BATCHINPUTFILEPATH is not defined. Aborting."
+		return $false
+	fi
+
+	echo "BATCHINPUTFILEPATH found: $BATCHINPUTFILEPATH."
+	return $true
+}
+
 match_input_to_dictionary()
 {
 	local input="$1"
@@ -72,8 +95,8 @@ set_target_directory()
 		return $false
 	fi
 
-	export INPUTFILEPATH="$answer"
-	echo "Target file defined as $INPUTFILEPATH. Note that this is only set for the current session."
+	export BATCHINPUTFILEPATH="$answer"
+	echo "Target file defined as $BATCHINPUTFILEPATH. Note that this is only set for the current session."
 	echo -n "Would you like to proceed? (Y/n)"
 	read -r answer
 
@@ -84,6 +107,33 @@ set_target_directory()
 
 	echo "Aborting. Buh-bye!"
 	return $false
+}
+
+generate_input_file_copies()
+{
+	local filename_prefix="$1"
+	local parameter_alias="$2"
+	local starting_value="$3"
+	local end_value="$4"
+	local interval_size="$5"
+	local queue_for_simulation="$6"
+
+	for value in $(seq "$starting_value" "$interval_size" "$end_value")
+	do
+		local filename="${filename_prefix}_${value}"
+		pretty_print "Generating ${filename}..."
+
+		rsync -arzP "$BATCHINPUTFILEPATH" "./$filename"
+		cull_obsolete_entries "$filename"
+		modify_input_parameter "$filename" "jobname" "$filename"
+		modify_input_parameter "$filename" "$parameter_alias" "$value"
+
+		if is_yes "$queue_for_simulation"
+		then
+			queue_for_simulation "$filename"
+		fi
+
+	done
 }
 
 generate_parameter_dictionary()
@@ -98,3 +148,62 @@ generate_parameter_dictionary()
 		["geometry"]="magnet_strategy"
 	)
 }
+
+modify_input_parameter()
+{
+	local input_file="$1"
+	local parameter_alias="$2"
+	local value="$3"
+
+	local original_pattern="^([[:blank:]]*${parameter}[[:blank:]]*=[[:blank:]]*)[^![:blank:]].*"
+	local parameter
+	parameter=$(match_input_to_dictionary "$parameter_alias")
+
+	# Uppercase `E` permits extended regex.
+	if grep -qE "$original_pattern" "$input_file"
+	then
+		# NB: `\` and `|` are equivalent delimiter characters.
+		sed -i -E "s|${original_pattern}|\1$value ! Modified by create_new_input_file.sh.|" "$input_file"
+		return $true
+	fi
+	
+	echo "Could not find specified parameter '$parameter'."
+	return $false
+}
+
+query_input_parameters()
+{
+	pretty_print_query "Please specify the following."
+	read -rp "Filename prefix: " filename_prefix
+	read -rp "Modified simulation parameter: " parameter
+	read -rp "Starting value: " starting_value
+	read -rp "End value: " end_value
+	read -rp "Interval size: " interval_size
+	read -rp "Queue for simulation when done (y/n): " queue_for_simulation
+	generate_input_file_copies "$filename_prefix" "$parameter" "$starting_value" "$end_value" "$interval_size" "$queue_for_simulation"
+}
+
+queue_for_simulation()
+{
+	local input_file="$1"
+	echo "Queueing $input_file as a GYSELA job."
+	./subgys "$input_file"
+	return $true
+}
+
+# Main script logic.
+if [[ $# -ne 0 ]]
+then
+	pretty_print "This is a script to quickly create a new input file for GYSELA simulations within this script's directory."
+	echo "This script should be placed within the \wk directory."
+	echo "The target file can be specified via the environment variable BATCHINPUTFILEPATH."
+	exit 1
+fi
+
+if ! define_input_path
+then
+	exit 1
+fi
+
+query_input_parameters
+exit 0
