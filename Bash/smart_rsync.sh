@@ -30,14 +30,24 @@ is_yes()
 copy_files()
 {
 	pretty_print "Copying files from $1 to $2".
-	exclusion_list=$(generate_exclusion_list)
-	rsync -arzP "$exclusion_list" "$1" "$2";
+	generate_exclusion_list
+	rsync -arzP "${EXCLUSIONS[@]}" "$1" "$2";
 }
 
-generate_exclusion_list()
+generate_exclusion_list() 
 {
-	exclusion_list="--exclude='rst_files/'"
-	echo "$exclusion_list"
+	EXCLUSIONS=(
+		"--exclude=rst_files/"
+		"--exclude=conservation_laws/"
+		"--exclude=POPE/"
+		"--exclude=rprof/"
+		"--exclude=/mtm_trace/"
+		"--exclude=init_state/"
+		"--exclude=f2d/"
+		"--exclude=f5d/"
+		"--exclude=fluxes3D/"
+		"--exclude=*.tmp"
+	)
 }
 
 # Main script logic.

@@ -27,12 +27,22 @@ is_yes()
 	esac
 }
 
+read_query() 
+{
+	local prompt_text="$1"
+	local var_name="$2"
+	
+	# Using %b for proper interpretation of escape sequences.
+	printf "\n%b " "${green}${prompt_text}${end_colour}"
+	read -r "$var_name"
+}
+
 # Bespoke helper functions.
 cull_obsolete_entries()
 {
 	local input_file="$1"
 	local patterns=(
-		"^[[:blank:]]*Vlasov Scheme[[:blank:]]*=[[:blank:]]*[^![:blank:]].*"
+		"^[[:blank:]]*Vlasov scheme[[:blank:]]*=[[:blank:]]*[^![:blank:]].*"
 	)
 
 	pretty_print "Culling obsolete entries..."
@@ -71,7 +81,6 @@ define_input_path()
 match_input_to_dictionary()
 {
 	local input="$1"
-	generate_parameter_dictionary
 
 	if [[ -v "parameter_dictionary[$input]" ]]
 	then 
@@ -132,7 +141,6 @@ generate_input_file_copies()
 		then
 			queue_for_simulation "$filename"
 		fi
-
 	done
 }
 
@@ -146,6 +154,9 @@ generate_parameter_dictionary()
 		["q"]="q_param1"
 		["tau"]="tau0"
 		["geometry"]="magnet_strategy"
+		["RH"]="Rosenbluth_Hinton"
+		["delta"]="delta_triangularity"
+		["kappa"]="kappa_elongation"
 	)
 }
 
@@ -155,9 +166,9 @@ modify_input_parameter()
 	local parameter_alias="$2"
 	local value="$3"
 
-	local original_pattern="^([[:blank:]]*${parameter}[[:blank:]]*=[[:blank:]]*)[^![:blank:]].*"
 	local parameter
 	parameter=$(match_input_to_dictionary "$parameter_alias")
+	local original_pattern="^([[:blank:]]*${parameter}[[:blank:]]*=[[:blank:]]*)[^![:blank:]].*"
 
 	# Uppercase `E` permits extended regex.
 	if grep -qE "$original_pattern" "$input_file"
@@ -174,12 +185,12 @@ modify_input_parameter()
 query_input_parameters()
 {
 	pretty_print_query "Please specify the following."
-	read -rp "Filename prefix: " filename_prefix
-	read -rp "Modified simulation parameter: " parameter
-	read -rp "Starting value: " starting_value
-	read -rp "End value: " end_value
-	read -rp "Interval size: " interval_size
-	read -rp "Queue for simulation when done (y/n): " queue_for_simulation
+	read_query "Filename prefix:" filename_prefix
+	read_query "Modified simulation parameter:" parameter
+	read_query "Starting value:" starting_value
+	read_query "End value:" end_value
+	read_query "Interval size:" interval_size
+	read_query "Queue for simulation when done (y/n):" queue_for_simulation
 	generate_input_file_copies "$filename_prefix" "$parameter" "$starting_value" "$end_value" "$interval_size" "$queue_for_simulation"
 }
 
@@ -205,5 +216,6 @@ then
 	exit 1
 fi
 
+generate_parameter_dictionary
 query_input_parameters
 exit 0

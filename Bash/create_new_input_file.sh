@@ -103,6 +103,9 @@ generate_parameter_dictionary()
 		["q"]="q_param1"
 		["tau"]="tau0"
 		["geometry"]="magnet_strategy"
+		["RH"]="Rosenbluth_Hinton"
+		["delta"]="delta_triangularity"
+		["kappa"]="kappa_elongation"
 	)
 }
 
@@ -127,7 +130,6 @@ generate_input_file_copy()
 match_input_to_dictionary()
 {
 	local input="$1"
-	generate_parameter_dictionary
 
 	if [[ -v "parameter_dictionary[$input]" ]]
 	then 
@@ -209,5 +211,6 @@ then
 	exit 1
 fi
 
+generate_parameter_dictionary
 generate_input_file_copy
 exit 0
