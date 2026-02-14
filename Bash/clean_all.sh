@@ -4,6 +4,8 @@
 # Because God hates Bash and myself, true is 0 and false is 1... so as to play nice with exit codes.
 readonly true=0
 readonly false=1
+readonly green="\033[0;32m"
+readonly end_colour="\033[0m"
 
 # Basic functions.
 pretty_print()
@@ -11,10 +13,15 @@ pretty_print()
 	printf "\n%s\n" "$1"
 }
 
+pretty_print_query()
+{
+	printf "\n%b" "${green}$1${end_colour}"
+}
+
 is_yes()
 {
 	case "$1" in
-		[yY]*)	return $true ;;
+		[yY]*|"")	return $true ;;
 		*)		return $false ;;
 	esac
 }
@@ -126,7 +133,7 @@ remove_all_simulation_links_and_directories()
 	fi
 
 	pretty_print "Found $link_count simulation links."
-	pretty_print "Would you like to remove them and their associated directories? (y/n)"
+	pretty_print_query "Would you like to remove them and their associated directories? (y/n)"
 	read -r answer
 
 	if ! is_yes "$answer"

@@ -29,9 +29,46 @@ is_yes()
 # Bespoke helper functions.
 copy_files()
 {
-	pretty_print "Copying files from $1 to $2".
+	local source="$1"
+	local destination="$2"
+
+	# Make directory in-case it doesn't already exist.
+	mkdir -p "$destination"
+
+	pretty_print "Copying files from $source to $destination".
 	generate_exclusion_list
-	rsync -arzP "${EXCLUSIONS[@]}" "$1" "$2";
+	rsync -arzP "${EXCLUSIONS[@]}" "$source" "$destination"
+}
+
+copy_all_simulation_dirs()
+{
+	local target_directory="$1"
+	local simulation_links=()
+	mapfile -d '' simulation_links < <(find . -maxdepth 1 -type l -name 'DN_*' -print0)
+	local link_count=${#simulation_links[@]}
+
+	if [[ $link_count -eq 0 ]]
+	then
+		pretty_print "No simulation links found in /wk!"
+		return
+	fi
+
+	pretty_print "Copying all folders with simulation links."
+	echo "Source directory: $NSCCPROJECTS."
+	echo "Target directory: $target_directory."
+	echo "Found $link_count simulation links."
+	
+	for link in "${simulation_links[@]}"
+	do
+		local simulation_directory
+		simulation_directory=$(readlink -f "$link")
+
+		if [[ -d "$simulation_directory" ]]
+		then
+			echo "Copying directory: $simulation_directory..."
+			copy_files "$simulation_directory" "$target_directory"
+		fi
+	done
 }
 
 generate_exclusion_list() 
@@ -49,6 +86,28 @@ generate_exclusion_list()
 		"--exclude=*.tmp"
 	)
 }
+
+if [[ $# -eq 1 ]]
+then
+	pretty_print "Specified target directory: $1"
+
+	if [[ ! -v NSCCPROJECTS ]]
+	then
+		echo "The environment variable NSCCPROJECTS is not defined. Aborting."
+		exit 1
+	fi
+
+	pretty_print_query "Would you like to copy over all simulation directories to the specified directory? (Y/n)"
+	read -r answer
+
+	if ! is_yes "$answer"
+	then
+		echo "Aborting."
+		exit 1
+	fi
+
+	copy_all_simulation_dirs "$1"
+fi
 
 # Main script logic.
 if [[ $# -ne 2 ]]
