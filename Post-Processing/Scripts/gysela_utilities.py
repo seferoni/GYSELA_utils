@@ -45,6 +45,35 @@ normalisation_parameters = {
 # -------- Radial propagation/PSD & FFT helper functions. -----------
 # -------------------------------------------------------------------
 
+def extract_gam_frequency(phi2D_list, time_step):
+
+	radial_time_series = generate_poloidally_averaged_time_series(phi2D_list);
+	frequencies, power_spectrum_density = map_power_spectrum(radial_time_series, 40, time_step.flatten()[0]);
+	# The division by 2 * pi is necessary to convert from angular frequency to linear frequency, as the former is what the FFT yields.
+	frequencies = convert_to_real_frequency(frequencies)/(2 * np.pi);
+	GAM_peak_index = isolate_GAM_peak_index(power_spectrum_density);
+	# We assume here that the peak corresponding to the GAM is the most prominent peak within the power spectrum.
+	# This assumption holds valid provided we have omitted the ZFZF peak!
+	GAM_frequency = frequencies[GAM_peak_index];
+	return GAM_frequency;
+
+def extract_gam_growth_rate(phi2D_list, radial_index = 40):
+
+	radially_localised_time_series = generate_poloidally_averaged_time_series(phi2D_list)[:, radial_index].values;
+	time_range = np.arange(len(radially_localised_time_series));
+	envelope, residual_level = generate_residual_envelope(radially_localised_time_series);
+
+	# The residual level behaves as a static vertical offset. By subtracting it from the envelope, we can isolate the pure decay signal.
+	pure_decay_signal = envelope - residual_level;
+	# Take only positive signal values prior to the tail of the signal to ensure well-behaved logarithmic fitting.
+	mask = pure_decay_signal > (0.05 * np.max(pure_decay_signal));
+	log_signal = convert_to_real_frequency(np.log(pure_decay_signal[mask]));
+	time_range_masked = time_range[mask];
+
+	# Fit a line to the logarithm of the envelope to extract the growth rate.
+	growth_rate, _ = np.polyfit(time_range_masked, log_signal, 1);
+	return growth_rate;
+
 def map_power_spectrum(time_series, radial_index, time_step, padding_factor = 5):
 
 	# Slice at radial index to isolate a strong signal.
@@ -84,8 +113,8 @@ def generate_residual_envelope(radial_time_series):
 	peaks = radial_time_series[peak_indices];
 	peak_times = np.arange(len(radial_time_series));
 
-	# Interpolate envelope.
-	envelope = interp1d(peak_indices, peaks, kind = "linear", bounds_error = False, fill_value = (peaks[0], peaks[-1]))(peak_times);
+	# Interpolate envelope. Chosen cubic here to better approximate Landau damping.
+	envelope = interp1d(peak_indices, peaks, kind = "cubic", bounds_error = False, fill_value = (peaks[0], peaks[-1]))(peak_times);
 	return envelope, residual_level;
 
 def isolate_GAM_peak_index(power_spectrum_density):

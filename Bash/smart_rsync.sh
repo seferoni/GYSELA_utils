@@ -40,34 +40,41 @@ copy_files()
 	rsync -arzP "${EXCLUSIONS[@]}" "$source" "$destination"
 }
 
-copy_all_simulation_dirs()
+copy_all_simulation_directories()
 {
 	local target_directory="$1"
+	local remote_host="${NSCCPROJECTS%%:*}"
+	local remote_path="${NSCCPROJECTS#*:}"
+
 	local simulation_links=()
-	mapfile -d '' simulation_links < <(find . -maxdepth 1 -type l -name 'DN_*' -print0)
+	mapfile -d '' simulation_links < <(ssh "$remote_host" "find $remote_path -maxdepth 1 -type l -name 'DN_*' -print0")
 	local link_count=${#simulation_links[@]}
 
 	if [[ $link_count -eq 0 ]]
 	then
-		pretty_print "No simulation links found in /wk!"
+		pretty_print "No simulation links found in $remote_path!"
 		return
 	fi
 
 	pretty_print "Copying all folders with simulation links."
-	echo "Source directory: $NSCCPROJECTS."
+	echo "Source directory: $remote_path."
 	echo "Target directory: $target_directory."
 	echo "Found $link_count simulation links."
 	
 	for link in "${simulation_links[@]}"
 	do
 		local simulation_directory
-		simulation_directory=$(readlink -f "$link")
+		simulation_directory=$(ssh "$remote_host" "readlink -f '$link'")
 
-		if [[ -d "$simulation_directory" ]]
+		# Check if path exists and is a directory.
+		if [[ ! -n "$simulation_directory" ]]
 		then
-			echo "Copying directory: $simulation_directory..."
-			copy_files "$simulation_directory" "$target_directory"
+			echo "Warning: $simulation_directory is not a valid directory. Skipping."
+			continue
 		fi
+
+		echo "Copying directory: $simulation_directory..."
+		copy_files "${remote_host}:${simulation_directory}" "$target_directory"
 	done
 }
 
@@ -80,8 +87,8 @@ generate_exclusion_list()
 		"--exclude=rprof/"
 		"--exclude=/mtm_trace/"
 		"--exclude=init_state/"
-		"--exclude=f2d/"
-		"--exclude=f5d/"
+		"--exclude=f2D/"
+		"--exclude=f5D/"
 		"--exclude=fluxes3D/"
 		"--exclude=*.tmp"
 	)
@@ -93,10 +100,11 @@ then
 
 	if [[ ! -v NSCCPROJECTS ]]
 	then
-		echo "The environment variable NSCCPROJECTS is not defined. Aborting."
+		echo "The environment variable for the simulation directory NSCCPROJECTS is not defined. Aborting."
 		exit 1
 	fi
 
+	echo "Found simulation directory: $NSCCPROJECTS"
 	pretty_print_query "Would you like to copy over all simulation directories to the specified directory? (Y/n)"
 	read -r answer
 
@@ -106,7 +114,8 @@ then
 		exit 1
 	fi
 
-	copy_all_simulation_dirs "$1"
+	copy_all_simulation_directories "$1"
+	exit 0
 fi
 
 # Main script logic.
