@@ -58,7 +58,7 @@ def extract_gam_frequency(phi2D_list, time_step):
 	return GAM_frequency;
 
 def extract_gam_growth_rate(phi2D_list, radial_index = 40):
-
+	# TODO: may need revisions
 	radially_localised_time_series = generate_poloidally_averaged_time_series(phi2D_list)[:, radial_index].values;
 	time_range = np.arange(len(radially_localised_time_series));
 	envelope, residual_level = generate_residual_envelope(radially_localised_time_series);
