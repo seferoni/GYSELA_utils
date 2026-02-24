@@ -1,6 +1,10 @@
 # Imports.
 import numpy as np;
 import xarray as xr;
+import pandas as pd;
+import h5_reader_xr as reader;
+import os;
+import glob;
 from scipy import signal;
 from scipy.interpolate import interp1d;
 from scipy.fft import fft, fftfreq;
@@ -103,18 +107,17 @@ def convert_to_real_frequency(frequency_term):
 	real_normalisation_coeff = normalisation_parameters["thermal_velocity"]/geometry["major_radius"];
 	return frequency_term * dimensionless_normalisation_coeff * real_normalisation_coeff;
 
-def generate_residual_envelope(radial_time_series):
+def generate_residual_envelope(radial_time_series, residual_window = 100):
 
 	# Isolate last one hundred entries in the time series as the residual.
-	residual_level = np.mean(radial_time_series[-100:]);
+	residual_level = np.mean(radial_time_series[-residual_window:]);
 	
 	# Isolate peaks.
 	peak_indices, _ = signal.find_peaks(radial_time_series, distance = 20);
 	peaks = radial_time_series[peak_indices];
 	peak_times = np.arange(len(radial_time_series));
-
-	# Interpolate envelope. Chosen cubic here to better approximate Landau damping.
-	envelope = interp1d(peak_indices, peaks, kind = "cubic", bounds_error = False, fill_value = (peaks[0], peaks[-1]))(peak_times);
+	# TODO: interpolation is not really necessary, is it? need to rewrite impl to account for this...
+	envelope = interp1d(peak_indices, peaks, kind = "linear", bounds_error = False, fill_value = (peaks[0], peaks[-1]))(peak_times);
 	return envelope, residual_level;
 
 def isolate_GAM_peak_index(power_spectrum_density):
@@ -153,6 +156,52 @@ def generate_xy_grid(phi2D_dataset):
 	x = r_coords * np.cos(theta_coords);
 	y = r_coords * np.sin(theta_coords);
 	return x, y;
+
+# -------------------------------------------------------------------
+# ------------------- Batch/parameter scan logic. -------------------
+# -------------------------------------------------------------------
+
+def parameter_scan_analysis_phi2D(base_directory, folder_prefix):
+
+	# `folder_prefix` should be of the form "DN_*_*_[parameter value]" (DN is the standard GYSELA format, not necessarily invoked here).
+	search_pattern = os.path.join(base_directory, f"{folder_prefix}_*");
+	# Match search pattern, return list in ascending order.
+	matching_directories = sorted(glob.glob(search_pattern));
+
+	if not matching_directories:
+
+		print(f"No directories found matching pattern: {search_pattern}");
+		return;
+	
+	# Wrap in pandas dataframe later.
+	results = [];
+
+	for directory in matching_directories:
+
+		folder_basename = os.path.basename(directory);
+		# Split the folder name, taking the last entry as that corresponding to the parameter value.
+		parameter_value_string = folder_basename.split("_")[-1];
+		parameter_value = float(parameter_value_string);
+		print(f"Processing {folder_basename} with parameter value: {parameter_value}");
+	
+		# Load phi2D data.
+		phi2D_list = reader.compile_data_from_directory("Phirth_n0", f"{directory}/sp0/Phi2D");
+		time_step = reader.fetch_data_from_h5(f"{directory}/sp0/Phi2D/Phi2D_d00000.h5")["deltat"].values;
+	
+		# Process Phi2D data.
+		gam_frequency = extract_gam_frequency(phi2D_list, time_step);
+		gam_growth_rate = extract_gam_growth_rate(phi2D_list);
+	
+		# Store results as a table.
+		results.append({
+			"parameter_value": parameter_value,
+			"gam_frequency": gam_frequency,
+			"gam_growth_rate": gam_growth_rate,
+			"folder_name": folder_basename
+		});
+
+	dataframe_results = pd.DataFrame(results).sort_values(by = "parameter_value");
+	return dataframe_results;
 
 # -------------------------------------------------------------------
 # ------------------- Auxiliary methods. ----------------------------
