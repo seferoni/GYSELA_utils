@@ -49,13 +49,13 @@ normalisation_parameters = {
 # -------- Radial propagation/PSD & FFT helper functions. -----------
 # -------------------------------------------------------------------
 
-def extract_gam_frequency(phi2D_list, time_step):
+def extract_gam_frequency(phi2D_list, time_step, radial_index):
 
 	radial_time_series = generate_poloidally_averaged_time_series(phi2D_list);
-	frequencies, power_spectrum_density = map_power_spectrum(radial_time_series, 40, time_step.flatten()[0]);
+	frequencies, power_spectrum_density = map_power_spectrum(radial_time_series, radial_index, time_step.flatten()[0]);
 	# The division by 2 * pi is necessary to convert from angular frequency to linear frequency, as the former is what the FFT yields.
 	frequencies = convert_to_real_frequency(frequencies)/(2 * np.pi);
-	GAM_peak_index = isolate_GAM_peak_index(power_spectrum_density);
+	GAM_peak_index = isolate_GAM_peak_index(power_spectrum_density, frequencies);
 	# We assume here that the peak corresponding to the GAM is the most prominent peak within the power spectrum.
 	# This assumption holds valid provided we have omitted the ZFZF peak!
 	GAM_frequency = frequencies[GAM_peak_index];
@@ -120,12 +120,19 @@ def generate_residual_envelope(radial_time_series, residual_window = 100):
 	envelope = interp1d(peak_indices, peaks, kind = "linear", bounds_error = False, fill_value = (peaks[0], peaks[-1]))(peak_times);
 	return envelope, residual_level;
 
-def isolate_GAM_peak_index(power_spectrum_density):
+def isolate_GAM_peak_index(power_spectrum_density, frequency_array, cutoff = 1000):
+	
+	frequency_mask = frequency_array > cutoff;
+	# Vacates the indexed value when the frequency is below the cutoff, effectively ignoring low-frequency peaks.
+	high_frequency_psd = np.where(frequency_mask, power_spectrum_density, 0);
 
-	# NB: `peak_indices` corresponds to peaks in `power_spectrum_density`.
-	# Prominence is calibrated to ensure a ZFZF power spike, if present, is ignored.
-	peak_indices, _ = signal.find_peaks(power_spectrum_density, prominence = power_spectrum_density.max() * 0.1);
-	peaks = power_spectrum_density[peak_indices];
+	peak_indices, _ = signal.find_peaks(high_frequency_psd, prominence = high_frequency_psd.max() * 0.2);
+
+	if len(peak_indices) == 0:
+		print(f"No peaks detected above the designated cutoff: {cutoff} Hz.");
+		return None;
+
+	peaks = high_frequency_psd[peak_indices];
 	GAM_peak_index = peak_indices[np.argmax(peaks)];
 	return GAM_peak_index;
 
