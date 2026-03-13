@@ -2,6 +2,7 @@
 import os;
 import sys;
 import pathlib;
+import diagnostics;
 import IO_utilities as IO;
 import gysela_utilities as utils;
 
@@ -14,6 +15,13 @@ sugared_diagnostic_names = {
 	"phixy_mn0_animation": f"$\phi$ (2D), Animation",
 	"hovmoller_mn0": "Hovmoller",
 	"GAM_phase_lag": "m = 1 vs m = 0 Phase Comparison"
+};
+
+# Contextual data.
+runtime_data = {
+	"phi2D_list": None,
+	"time_step": None,
+	"simulation_directory_path": None
 };
 
 # -------------------------------------------------------------------
@@ -39,21 +47,31 @@ def diagnostics_interface():
 		print("No diagnostics found! Exiting.");
 		return;
 
-	is_bash_env_var = input("Would you like to supply the simulation directory path as a Bash environment variable? (y/n) [default y]?: ");
+	directory_path = input("Please enter the path to the simulation output directory: ");
+	is_bash_env_var = input("Have you supplied a Bash environmental variable? (y/n) [default y]?: ");
 
 	if IO.is_yes(is_bash_env_var):
 
-		print("The simulation output directory path will be read as a Bash environment variable.");
+		print("Reading the directory path as a Bash environment variable...");
+		directory_path = IO.read_bash_env_variable(directory_path);
 
-	directory_path = input("Please enter the path to the simulation output directory.");
+	print(f"Got {directory_path} as the simulation data directory.");
+	print("Validating directory contents...")
 
 	if not validate_simulation_directory(directory_path, is_bash_env_var):
 
 		print("The provided simulation directory is not valid! Exiting.");
 		return;
 
+	print("Directory is valid.");
 	time_step, data_arrays = IO.fetch_timestep_and_data_arrays(directory_path, is_bash_env_var);
 	print_data_properties(time_step, data_arrays);
+	input_loop(diagnostics_files);
+
+def input_loop(options_list):
+
+	print_options(options_list);
+	answer = input("Select an option: ");
 	# TODO:
 
 def print_data_properties(time_step, data_arrays):

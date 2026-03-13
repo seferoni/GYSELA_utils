@@ -53,7 +53,7 @@ normalisation_parameters = {
 def extract_gam_frequency(phi2D_list, time_step, radial_index):
 
 	radial_time_series = generate_poloidally_averaged_time_series(phi2D_list);
-	frequencies, power_spectrum_density = map_power_spectrum(radial_time_series, radial_index, time_step.flatten()[0]);
+	frequencies, power_spectrum_density = map_power_spectrum(radial_time_series, radial_index, time_step);
 	# The division by 2 * pi is necessary to convert from angular frequency to linear frequency, as the former is what the FFT yields.
 	frequencies = convert_to_real_frequency(frequencies)/(2 * np.pi);
 	GAM_peak_index = isolate_GAM_peak_index(power_spectrum_density, frequencies);
@@ -63,7 +63,7 @@ def extract_gam_frequency(phi2D_list, time_step, radial_index):
 	GAM_frequency = frequencies[GAM_peak_index];
 	return GAM_frequency;
 
-def extract_gam_growth_rate(phi2D_list, radial_index = 40):
+def extract_gam_growth_rate(phi2D_list, radial_index):
 	# TODO: potentially fishy...
 	radially_localised_time_series = generate_poloidally_averaged_time_series(phi2D_list)[:, radial_index].values;
 	time_range = np.arange(len(radially_localised_time_series));
@@ -105,7 +105,7 @@ def map_power_spectrum(time_series, radial_index, time_step, padding_factor = 5)
 	return frequencies[mask], power_spectrum_density[mask];
 
 def convert_to_real_frequency(frequency_term):
-	# TODO: see comment above on normalisation_parameters. Logic is fine, variables are probably not.
+	# TODO: see comment above on normalisation_parameters.
 	dimensionless_normalisation_coeff = normalisation_parameters["normalisation_coeff_gys"];
 	real_normalisation_coeff = normalisation_parameters["thermal_velocity"]/geometry["major_radius"];
 	return frequency_term * dimensionless_normalisation_coeff * real_normalisation_coeff;
@@ -128,8 +128,7 @@ def isolate_GAM_peak_index(power_spectrum_density, frequency_array, cutoff = 100
 	frequency_mask = frequency_array > cutoff;
 	# Vacates the indexed value when the frequency is below the cutoff, effectively ignoring low frequency (ZFZF) peaks.
 	high_frequency_psd = np.where(frequency_mask, power_spectrum_density, 0);
-	# This may be a little too aggressive, prominence-wise, depending on the intensity of turbulence in the system.
-	# But most certainly necessary for flux-driven runs...
+	# This may need a little fine-tuning, prominence-wise, depending on the intensity of turbulence in the system.
 	peak_indices, _ = signal.find_peaks(high_frequency_psd, prominence = high_frequency_psd.max() * 0.2);
 
 	if not peak_indices:
@@ -233,7 +232,7 @@ def isolate_m1_component(phirth_xarray):
 def generate_poloidally_averaged_time_series(phirth_list, m1 = False):
 
 	# Poloidal averaging, equivalent in function to flux-surface averaging. This isolates the m = 0 zonal component.
-	# Intuitively speaking, this also 'truncates' the circular geometry into one-dimensional radial strips.
+	# Intuitively speaking, this also 'folds' the circular geometry into one-dimensional radial strips.
 	operation = lambda entry : entry.mean(dim = "theta") if not m1 else isolate_m1_component(entry);
 	radial_strips = [operation(phirth_xarray) for phirth_xarray in phirth_list];
 
