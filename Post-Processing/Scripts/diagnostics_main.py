@@ -15,7 +15,7 @@ options = {
 def diagnostics_interface():
 
 	print("This script is the main entry point for all post-processing scripts and diagnostics.");
-	is_bash_env_var = input("Would you like to supply a simulation path as a Bash environment variable? (y/n) [default y]?: ");
+	is_bash_env_var = input("Would you like to supply the simulation directory path as a Bash environment variable? (y/n) [default y]?: ");
 
 	if IO.is_yes(is_bash_env_var):
 

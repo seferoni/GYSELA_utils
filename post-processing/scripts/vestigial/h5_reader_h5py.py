@@ -1,7 +1,11 @@
+# Imports.
 import sys;
 import h5py;
 import numpy as np;
 from pathlib import Path;
+
+# NB: what follows is mostly vestigial/incomplete code.
+# In almost all cases, use h5_reader_xr instead!
 
 # Auxiliary functions.
 def compile_phi2D_data(h5_files):
@@ -10,6 +14,7 @@ def compile_phi2D_data(h5_files):
 	phi2D_data = [];
 
 	for h5_file in h5_files:
+
 		phi2D_n0 = read_hdf5_file(h5_file);
 		phi2D_data.append(phi2D_n0);
 
@@ -20,6 +25,7 @@ def fetch_phi2D_filepaths(nominal_path):
 	directory_path = Path(nominal_path);
 
 	if not directory_path.is_dir():
+
 		print(f"Error: The given directory '{nominal_path}' could not be resolved.");
 		return [];
 
@@ -35,6 +41,7 @@ def read_hdf5_file(filepath):
 def fetch_phi2D_data():
 
 	if len(sys.argv) != 2:
+
 		print("Usage: python hdf5_reader.py <absolute_path_to_hdf5_file>");
 		print("Aborting.");
 		sys.exit(1);
@@ -43,6 +50,7 @@ def fetch_phi2D_data():
 	h5_files = fetch_phi2D_filepaths(h5_directory);
 	
 	if len(h5_files) == 0:
+
 		print("No HDF5 files found in the specified directory.");
 		print("Aborting.");
 		sys.exit(1);

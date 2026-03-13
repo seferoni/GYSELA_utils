@@ -14,7 +14,7 @@ from scipy.fft import fft, fftfreq;
 # -------------------------------------------------------------------
 
 # The variables below are nominally private - not to be altered during run-time!
-# Sourced from GAM_analytical.py.
+# Sourced from GAM_analytical.py. Veracity is... dubious. Should double-check at some point...
 
 physical_constants = {
 	"electron_volt" : 1.602176634e-19, # In Joules.
@@ -41,6 +41,7 @@ simulation_parameters = {
 };
 
 normalisation_parameters = {
+	# TODO: using these normalisation parameters, we get GAM frequencies an order of magnitude smaller than we should. Bad.
 	"thermal_velocity" : np.sqrt(simulation_parameters["ion_temperature_joules"]/simulation_parameters["ion_mass"]),
 	"normalisation_coeff_gys" : geometry["aspect_ratio_gys"]/(simulation_parameters["rhostar_gys"] * np.sqrt(2.))
 };
@@ -58,11 +59,12 @@ def extract_gam_frequency(phi2D_list, time_step, radial_index):
 	GAM_peak_index = isolate_GAM_peak_index(power_spectrum_density, frequencies);
 	# We assume here that the peak corresponding to the GAM is the most prominent peak within the power spectrum.
 	# This assumption holds valid provided we have omitted the ZFZF peak!
+	# This gets a little fishy when we're analysing a spectrum with a low SNR... need robust, sometimes aggressive frequency cut-off/masking.
 	GAM_frequency = frequencies[GAM_peak_index];
 	return GAM_frequency;
 
 def extract_gam_growth_rate(phi2D_list, radial_index = 40):
-	# TODO: may need revisions
+	# TODO: potentially fishy...
 	radially_localised_time_series = generate_poloidally_averaged_time_series(phi2D_list)[:, radial_index].values;
 	time_range = np.arange(len(radially_localised_time_series));
 	envelope, residual_level = generate_residual_envelope(radially_localised_time_series);
@@ -89,7 +91,8 @@ def map_power_spectrum(time_series, radial_index, time_step, padding_factor = 5)
 	signal = (signal - np.mean(signal)) * np.hanning(signal_steps);
 
 	# Fourier transform from time-domain to frequency-domain.
-	# Pad signal with 0s to improve resolution.
+	# ...and pad signal with 0s to improve resolution. This CAN exacerbate the appearance of spectral leakage artefacts!
+	# Sucks for you if your signal is already highly corrugated, as in very turbulent regimes...
 	padded_signal_steps = signal_steps * padding_factor;
 	signal_fourier = np.array(fft(signal, n = padded_signal_steps));
 	power_spectrum_density = np.abs(signal_fourier) ** 2;
@@ -102,33 +105,35 @@ def map_power_spectrum(time_series, radial_index, time_step, padding_factor = 5)
 	return frequencies[mask], power_spectrum_density[mask];
 
 def convert_to_real_frequency(frequency_term):
-
+	# TODO: see comment above on normalisation_parameters. Logic is fine, variables are probably not.
 	dimensionless_normalisation_coeff = normalisation_parameters["normalisation_coeff_gys"];
 	real_normalisation_coeff = normalisation_parameters["thermal_velocity"]/geometry["major_radius"];
 	return frequency_term * dimensionless_normalisation_coeff * real_normalisation_coeff;
 
 def generate_residual_envelope(radial_time_series, residual_window = 100):
 
-	# Isolate last one hundred entries in the time series as the residual.
+	# Isolate last one hundred entries in the time series as the residual. Arbitrary.
 	residual_level = np.mean(radial_time_series[-residual_window:]);
 	
 	# Isolate peaks.
 	peak_indices, _ = signal.find_peaks(radial_time_series, distance = 20);
 	peaks = radial_time_series[peak_indices];
 	peak_times = np.arange(len(radial_time_series));
-	# TODO: interpolation is not really necessary, is it? need to rewrite impl to account for this...
+	# TODO: interpolation is not really necessary, is it? Harmless, but inefficient.
 	envelope = interp1d(peak_indices, peaks, kind = "linear", bounds_error = False, fill_value = (peaks[0], peaks[-1]))(peak_times);
 	return envelope, residual_level;
 
 def isolate_GAM_peak_index(power_spectrum_density, frequency_array, cutoff = 1000):
-	
-	frequency_mask = frequency_array > cutoff;
-	# Vacates the indexed value when the frequency is below the cutoff, effectively ignoring low-frequency peaks.
-	high_frequency_psd = np.where(frequency_mask, power_spectrum_density, 0);
 
+	frequency_mask = frequency_array > cutoff;
+	# Vacates the indexed value when the frequency is below the cutoff, effectively ignoring low frequency (ZFZF) peaks.
+	high_frequency_psd = np.where(frequency_mask, power_spectrum_density, 0);
+	# This may be a little too aggressive, prominence-wise, depending on the intensity of turbulence in the system.
+	# But most certainly necessary for flux-driven runs...
 	peak_indices, _ = signal.find_peaks(high_frequency_psd, prominence = high_frequency_psd.max() * 0.2);
 
-	if len(peak_indices) == 0:
+	if not peak_indices:
+
 		print(f"No peaks detected above the designated cutoff: {cutoff} Hz.");
 		return None;
 
@@ -168,7 +173,7 @@ def generate_xy_grid(phi2D_dataset):
 # ------------------- Batch/parameter scan logic. -------------------
 # -------------------------------------------------------------------
 
-def parameter_scan_analysis_phi2D(base_directory, folder_prefix):
+def parameter_scan_analysis_phi2D(base_directory, folder_prefix, radial_index):
 
 	# `folder_prefix` should be of the form "DN_*_*_[parameter value]" (DN is the standard GYSELA format, not necessarily invoked here).
 	search_pattern = os.path.join(base_directory, f"{folder_prefix}_*");
@@ -196,8 +201,8 @@ def parameter_scan_analysis_phi2D(base_directory, folder_prefix):
 		time_step = reader.fetch_data_from_h5(f"{directory}/sp0/Phi2D/Phi2D_d00000.h5")["deltat"].values;
 	
 		# Process Phi2D data.
-		gam_frequency = extract_gam_frequency(phi2D_list, time_step);
-		gam_growth_rate = extract_gam_growth_rate(phi2D_list);
+		gam_frequency = extract_gam_frequency(phi2D_list, time_step, radial_index);
+		gam_growth_rate = extract_gam_growth_rate(phi2D_list, radial_index);
 	
 		# Store results as a table.
 		results.append({
@@ -220,6 +225,8 @@ def isolate_m1_component(phirth_xarray):
 	
 	# Take note that the m = 1 can be isolated by projecting phi unto sin(theta).
 	# This is permitted due to Fourier decomposition & orthogonality properties.
+	# Exactly commensurate with what we do analytically re decomposition into poloidal harmonics.
+	# Should note that this gets a bit dicey for shaped equilibria, because coupling is no longer strictly sin(theta)-based!
 	phi_m1 = (phirth_xarray * np.sin(theta)[:, None]).mean(dim = "theta");
 	return phi_m1;
 
