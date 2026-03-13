@@ -1,6 +1,8 @@
+# Imports.
 import xarray as xr
 from pathlib import Path
 
+# General utility functions.
 def compile_data_from_directory(data_key, nominal_path, to_numpy = False):
 
 	dataset_list = fetch_data_from_directory(nominal_path);
@@ -15,8 +17,9 @@ def compile_data_from_directory(data_key, nominal_path, to_numpy = False):
 
 def fetch_data_from_h5(filepath):
 
+	# If xarray complains (as it is often wont to do), changing the engine can help.
 	dataset = xr.open_dataset(filepath, engine = "h5netcdf", phony_dims = "sort");
-	# NB: As per the input file, Nr = 63, Ntheta = 128, Nphi = 8.
+
 	# We match each `phony_dim` by comparing array sizes.
 	dataset = dataset.rename(phony_dim_0 = "zeta", phony_dim_1 = "r", phony_dim_2 = "theta").load();
 	# Discard size-1 dimensions.
@@ -40,10 +43,12 @@ def fetch_data_from_directory(nominal_path):
 	h5_files = fetch_phi2D_filepaths(nominal_path);
 
 	if (len(h5_files) == 0):
-		print(f"Error: no h5 files could be retrieved from {nominal_path}.");
+
+		print(f"No h5 files could be retrieved from {nominal_path}.");
 		return compiled_data;
 
 	for h5_file in h5_files:
+
 		data = fetch_data_from_h5(h5_file);
 		compiled_data.append(data);
 
