@@ -19,6 +19,8 @@ sugared_diagnostic_names = {
 
 # Contextual data.
 runtime_data = {
+	
+	"filename_prefix": None,
 	"phi2D_list": None,
 	"time_step": None,
 	"simulation_directory_path": None
@@ -27,6 +29,11 @@ runtime_data = {
 # -------------------------------------------------------------------
 # --------------------Interface/front-end logic. --------------------
 # -------------------------------------------------------------------
+
+def process_filename(suffix):
+
+	prefix = runtime_data.get("filename_prefix");
+	return f"{prefix}_{suffix}";
 
 def get_diagnostics():
 

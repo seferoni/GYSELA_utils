@@ -1,6 +1,6 @@
 # Imports.
-import xarray as xr
-from pathlib import Path
+import xarray as xr;
+from pathlib import Path;
 
 # General utility functions.
 def compile_data_from_directory(data_key, nominal_path, to_numpy = False):
@@ -42,7 +42,7 @@ def fetch_data_from_directory(nominal_path):
 	compiled_data = [];
 	h5_files = fetch_phi2D_filepaths(nominal_path);
 
-	if (len(h5_files) == 0):
+	if not h5_files:
 
 		print(f"No h5 files could be retrieved from {nominal_path}.");
 		return compiled_data;

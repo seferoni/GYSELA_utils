@@ -35,15 +35,15 @@ simulation_parameters_raw = {
 
 simulation_parameters = {
 	"ion_temperature_joules" : simulation_parameters_raw["ion_temperature"] * 1000. * physical_constants["electron_volt"],
-	"electron_temperature_joules" : simulation_parameters_raw["electron_temperature"]  * 1000. * physical_constants["electron_volt"],
+	"electron_temperature_joules" : simulation_parameters_raw["electron_temperature"] * 1000. * physical_constants["electron_volt"],
 	"ion_mass" : 2.0 * physical_constants["proton_mass"], # Presuming deuterium.
-	"rhostar_gys" : 1./float(geometry["minor_radius_gys"]),
+	"rhostar_gys" : 1. / float(geometry["minor_radius_gys"]),
 };
 
 normalisation_parameters = {
 	# TODO: using these normalisation parameters, we get GAM frequencies an order of magnitude smaller than we should. Bad.
-	"thermal_velocity" : np.sqrt(simulation_parameters["ion_temperature_joules"]/simulation_parameters["ion_mass"]),
-	"normalisation_coeff_gys" : geometry["aspect_ratio_gys"]/(simulation_parameters["rhostar_gys"] * np.sqrt(2.))
+	"thermal_velocity" : np.sqrt(simulation_parameters["ion_temperature_joules"] / simulation_parameters["ion_mass"]),
+	"normalisation_coeff_gys" : geometry["aspect_ratio_gys"] / (simulation_parameters["rhostar_gys"] * np.sqrt(2.))
 };
 
 # -------------------------------------------------------------------
@@ -107,7 +107,7 @@ def map_power_spectrum(time_series, radial_index, time_step, padding_factor = 5)
 def convert_to_real_frequency(frequency_term):
 	# TODO: see comment above on normalisation_parameters.
 	dimensionless_normalisation_coeff = normalisation_parameters["normalisation_coeff_gys"];
-	real_normalisation_coeff = normalisation_parameters["thermal_velocity"]/geometry["major_radius"];
+	real_normalisation_coeff = normalisation_parameters["thermal_velocity"] / geometry["major_radius"];
 	return frequency_term * dimensionless_normalisation_coeff * real_normalisation_coeff;
 
 def generate_residual_envelope(radial_time_series, residual_window = 100):
@@ -239,3 +239,17 @@ def generate_poloidally_averaged_time_series(phirth_list, m1 = False):
 	# The following produces a two-dimensional x-array of shape (time, radial coordinate).
 	time_series = xr.concat(radial_strips, dim = "time");
 	return time_series;
+
+def butterworth_filter(time_series, time_step, cutoff = 200):
+
+	# Determine sampling rate and Nyquist frequency in Hz.
+	# Presume micro-seconds for GYSELA's code timestep. This should probably be validated...
+	sampling_rate = 1.0 / (time_step * 1e-6);
+	nyquist_frequency = 0.5 * sampling_rate;
+	normalised_cutoff = cutoff / nyquist_frequency;
+
+	# Denominator and numerator of the impulse response filter, respectively.
+	# We choose here a fourth order high-pass filter.
+	b, a = signal.butter(N = 4, Wn = normalised_cutoff, btype = "high");
+	filtered_signal = signal.filtfilt(b, a, time_series);
+	return filtered_signal;
