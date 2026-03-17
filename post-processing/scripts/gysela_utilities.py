@@ -72,9 +72,14 @@ def extract_gam_frequency(phi2D_list, time_step, radial_index):
 	GAM_frequency = frequencies[GAM_peak_index];
 	return GAM_frequency;
 
-def extract_gam_growth_rate(phi2D_list, radial_index, noise_threshold = 0.10):
-
+def extract_gam_growth_rate(phi2D_list, time_step, radial_index, noise_threshold = 0.05, signal_high_pass = False):
+	# TODO: not exceptionally well-behaved with the high pass...
 	radially_localised_time_series = generate_poloidally_averaged_time_series(phi2D_list)[:, radial_index].values;
+
+	if signal_high_pass:
+		# This typically needs to be employed for when the background profile has a trend of some kind.
+		radially_localised_time_series = butterworth_filter(radially_localised_time_series, time_step);
+
 	# Eventually we may need to modify this method's signature to accommodate different sampling frequencies.
 	sampling_frequency = calculate_sampling_frequency();
 	time_range = np.arange(len(radially_localised_time_series)) / sampling_frequency;
@@ -192,7 +197,7 @@ def generate_xy_grid(phi2D_dataset):
 # ------------------- Batch/parameter scan logic. -------------------
 # -------------------------------------------------------------------
 
-def parameter_scan_analysis_phi2D(base_directory, folder_prefix, radial_index):
+def parameter_scan_analysis_phi2D(base_directory, folder_prefix, radial_index, signal_high_pass = False):
 
 	# `folder_prefix` should be of the form "DN_*_*_[parameter value]" (DN is the standard GYSELA format, not necessarily invoked here).
 	search_pattern = os.path.join(base_directory, f"{folder_prefix}_*");
@@ -221,7 +226,7 @@ def parameter_scan_analysis_phi2D(base_directory, folder_prefix, radial_index):
 	
 		# Process Phi2D data.
 		gam_frequency = extract_gam_frequency(phi2D_list, time_step, radial_index);
-		gam_growth_rate = extract_gam_growth_rate(phi2D_list, radial_index);
+		gam_growth_rate = extract_gam_growth_rate(phi2D_list, time_step, radial_index, signal_high_pass);
 	
 		# Store results as a table.
 		results.append({
