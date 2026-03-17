@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gysela_utils"
+version = "1.0.0"
+description = "Diagnostics and post-processing for GYSELA simulations."
+dependencies = [
+	"numpy",
+	"scipy",
+	"xarray",
+	"h5py",
+	"matplotlib"
+]
+
+[tool.setuptools.packages.find]
+where = ["scripts"]

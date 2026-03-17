@@ -50,6 +50,15 @@ normalisation_parameters = {
 # -------- Radial propagation/PSD & FFT helper functions. -----------
 # -------------------------------------------------------------------
 
+def calculate_sampling_frequency(diagnostic_interval_steps = 2, time_step = 25):
+
+	# The logic is this: we have 1 Phi2D file for every two time-steps (GSTEPS).
+	# So the diagnostic interval is two time-steps.
+	# `time_step` is simply delta_t. This can be read off from the simulation input file or from the output Phi2D files.
+	# This still retains the normalisation interred within GYSELA itself.
+	diagnostic_time_step = time_step * diagnostic_interval_steps;
+	return 1 / diagnostic_time_step;
+
 def extract_gam_frequency(phi2D_list, time_step, radial_index):
 
 	radial_time_series = generate_poloidally_averaged_time_series(phi2D_list);
@@ -63,16 +72,19 @@ def extract_gam_frequency(phi2D_list, time_step, radial_index):
 	GAM_frequency = frequencies[GAM_peak_index];
 	return GAM_frequency;
 
-def extract_gam_growth_rate(phi2D_list, radial_index):
-	# TODO: potentially fishy...
+def extract_gam_growth_rate(phi2D_list, radial_index, noise_threshold = 0.10):
+
 	radially_localised_time_series = generate_poloidally_averaged_time_series(phi2D_list)[:, radial_index].values;
-	time_range = np.arange(len(radially_localised_time_series));
+	# Eventually we may need to modify this method's signature to accommodate different sampling frequencies.
+	sampling_frequency = calculate_sampling_frequency();
+	time_range = np.arange(len(radially_localised_time_series)) / sampling_frequency;
 	envelope, residual_level = generate_residual_envelope(radially_localised_time_series);
 
-	# The residual level behaves as a static vertical offset. By subtracting it from the envelope, we can isolate the pure decay signal.
+	# The residual level (should) behave as a static vertical offset. 
+	# By subtracting it from the envelope, we can isolate the pure decay signal.
 	pure_decay_signal = envelope - residual_level;
 	# Take only positive signal values prior to the tail of the signal to ensure well-behaved logarithmic fitting.
-	mask = pure_decay_signal > (0.05 * np.max(pure_decay_signal));
+	mask = pure_decay_signal > (noise_threshold * np.max(pure_decay_signal));
 	log_signal = convert_to_real_frequency(np.log(pure_decay_signal[mask]));
 	time_range_masked = time_range[mask];
 
@@ -110,16 +122,24 @@ def convert_to_real_frequency(frequency_term):
 	real_normalisation_coeff = normalisation_parameters["thermal_velocity"] / geometry["major_radius"];
 	return frequency_term * dimensionless_normalisation_coeff * real_normalisation_coeff;
 
-def generate_residual_envelope(radial_time_series, residual_window = 100):
+def generate_residual_envelope(radial_time_series, residual_window = 100, minimum_peak_distance = 20):
 
-	# Isolate last one hundred entries in the time series as the residual. Arbitrary.
+	# Isolate a given number of entries in the time series as the residual. Arbitrary.
 	residual_level = np.mean(radial_time_series[-residual_window:]);
 	
 	# Isolate peaks.
-	peak_indices, _ = signal.find_peaks(radial_time_series, distance = 20);
+	# The minimum distance between peaks here should actually be rigorously calculated using the sampling frequency.
+	# But in practice, we can post-hoc validate, with some ease, that this value works via the RH diagnostic.
+	# Unless the sampling frequency changes between runs, this value should work.
+	peak_indices, _ = signal.find_peaks(radial_time_series, distance = minimum_peak_distance);
+
+	# Nonetheless, we can add a simple sanity check to make sure our lazy approach is still sensible...
+	if (len(peak_indices) < 5):
+
+		print(f"Only {len(peak_indices)} were found. You may wish to change the 'minimum_peak_distance' parameter.");
+
 	peaks = radial_time_series[peak_indices];
 	peak_times = np.arange(len(radial_time_series));
-	# TODO: interpolation is not really necessary, is it? Harmless, but inefficient.
 	envelope = interp1d(peak_indices, peaks, kind = "linear", bounds_error = False, fill_value = (peaks[0], peaks[-1]))(peak_times);
 	return envelope, residual_level;
 
