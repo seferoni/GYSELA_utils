@@ -71,14 +71,14 @@ def extract_gam_frequency(phi2D_list, time_step, radial_index, convert_to_real_f
 	GAM_frequency = frequencies[GAM_peak_index];
 	return GAM_frequency;
 
-def extract_gam_growth_rate(phi2D_list, time_step, radial_index, noise_threshold = 0.05, output_stride = 2):
+def extract_gam_growth_rate(phi2D_list, time_step, radial_index, frequency, noise_threshold = 0.05, output_stride = 2):
 
 	radially_localised_time_series = generate_poloidally_averaged_time_series(phi2D_list)[:, radial_index].values;
 
 	# Eventually we may need to modify this method's signature to accommodate different sampling frequencies.
 	sampling_frequency = calculate_sampling_frequency(output_stride, time_step);
 	time_range = np.arange(len(radially_localised_time_series)) / sampling_frequency;
-	envelope, residual_level = generate_residual_envelope(radially_localised_time_series);
+	envelope, residual_level = generate_residual_envelope(radially_localised_time_series, time_step, frequency, output_stride = output_stride);
 
 	# The residual level (should) behave as a static vertical offset. 
 	# By subtracting it from the envelope, we can isolate the pure decay signal.
@@ -186,7 +186,7 @@ def generate_xy_grid(phi2D_dataset):
 # ------------------- Batch/parameter scan logic. -------------------
 # -------------------------------------------------------------------
 
-def parameter_scan_analysis_phi2D(base_directory, folder_prefix, radial_index, signal_high_pass = False):
+def parameter_scan_analysis_phi2D(base_directory, folder_prefix, radial_index):
 
 	# `folder_prefix` should be of the form "DN_*_*_[parameter value]" (DN is the standard GYSELA format, not necessarily invoked here).
 	search_pattern = os.path.join(base_directory, f"{folder_prefix}_*");
@@ -215,7 +215,7 @@ def parameter_scan_analysis_phi2D(base_directory, folder_prefix, radial_index, s
 	
 		# Process Phi2D data. We preserve GYSELA's normalisation convention (to the ion cyclotron frequency).
 		gam_frequency = extract_gam_frequency(phi2D_list, time_step, radial_index);
-		gam_growth_rate = extract_gam_growth_rate(phi2D_list, time_step, radial_index);
+		gam_growth_rate = extract_gam_growth_rate(phi2D_list, time_step, radial_index, gam_frequency);
 	
 		# Store results as a table.
 		results.append({
@@ -254,7 +254,7 @@ def generate_poloidally_averaged_time_series(phirth_list, m1 = False):
 	time_series = xr.concat(radial_strips, dim = "time");
 	return time_series;
 
-def butterworth_band_pass_filter(time_series, time_step, low_cutoff = 0.1, high_cutoff = 0.4, output_stride = 2):
+def butterworth_band_pass_filter(time_series, time_step, low_cutoff = 0.0005, high_cutoff = 0.0025, output_stride = 2):
 
 	# Determine sampling rate and Nyquist frequency in normalised units.
 	# Note that cutoff frequencies also therefore becomes normalised...
