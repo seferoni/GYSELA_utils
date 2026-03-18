@@ -123,21 +123,14 @@ def convert_to_real_frequency(frequency_term):
 	real_normalisation_coeff = normalisation_parameters["thermal_velocity"] / geometry["major_radius"];
 	return frequency_term * dimensionless_normalisation_coeff * real_normalisation_coeff;
 
-def generate_residual_envelope(radial_time_series, residual_window = 100, minimum_peak_distance = 20):
+def generate_residual_envelope(radial_time_series, time_step, frequency, residual_window = 100, output_stride = 2):
 
 	# Isolate a given number of entries in the time series as the residual. Arbitrary.
 	residual_level = np.mean(radial_time_series[-residual_window:]);
 	
 	# Isolate peaks.
-	# The minimum distance between peaks here should actually be rigorously calculated using the sampling frequency.
-	# But in practice, we can post-hoc validate, with some ease, that this value works via the RH diagnostic.
-	# TODO: we must fix this at some point...
-	peak_indices, _ = signal.find_peaks(radial_time_series, distance = minimum_peak_distance);
-
-	# Nonetheless, we can add a simple sanity check to make sure our lazy approach is still sensible...
-	if (len(peak_indices) < 5):
-
-		print(f"Only {len(peak_indices)} were found. You may wish to change the 'minimum_peak_distance' parameter.");
+	minimum_distance = (1 / frequency) * 0.5 * (1 / time_step);
+	peak_indices, _ = signal.find_peaks(radial_time_series, distance = minimum_distance);
 
 	peaks = radial_time_series[peak_indices];
 	peak_times = np.arange(len(radial_time_series));
