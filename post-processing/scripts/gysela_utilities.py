@@ -144,7 +144,7 @@ def generate_residual_envelope(radial_time_series, residual_window = 100, minimu
 	envelope = interp1d(peak_indices, peaks, kind = "linear", bounds_error = False, fill_value = (peaks[0], peaks[-1]))(peak_times);
 	return envelope, residual_level;
 
-def isolate_GAM_peak_index(power_spectrum_density, frequency_array, cutoff = 1000):
+def isolate_GAM_peak_index(power_spectrum_density, frequency_array, cutoff = 0.001):
 
 	frequency_mask = frequency_array > cutoff;
 	# Vacates the indexed value when the frequency is below the cutoff, effectively ignoring low frequency (ZFZF) peaks.
