@@ -50,13 +50,13 @@ normalisation_parameters = {
 # -------- Radial propagation/PSD & FFT helper functions. -----------
 # -------------------------------------------------------------------
 
-def calculate_sampling_frequency(diagnostic_interval_steps = 2, time_step = 25):
+def calculate_sampling_frequency(output_stride = 2, time_step = 25):
 
 	# The logic is this: we have 1 Phi2D file for every two time-steps (GSTEPS).
 	# So the diagnostic interval is two time-steps.
 	# `time_step` is simply delta_t. This can be read off from the simulation input file or from the output Phi2D files.
 	# This still retains the normalisation interred within GYSELA itself.
-	diagnostic_time_step = time_step * diagnostic_interval_steps;
+	diagnostic_time_step = time_step * output_stride;
 	return 1 / diagnostic_time_step;
 
 def extract_gam_frequency(phi2D_list, time_step, radial_index):
@@ -72,16 +72,12 @@ def extract_gam_frequency(phi2D_list, time_step, radial_index):
 	GAM_frequency = frequencies[GAM_peak_index];
 	return GAM_frequency;
 
-def extract_gam_growth_rate(phi2D_list, time_step, radial_index, noise_threshold = 0.05, signal_high_pass = False):
-	# TODO: not exceptionally well-behaved with the high pass...
+def extract_gam_growth_rate(phi2D_list, time_step, radial_index, noise_threshold = 0.05):
+
 	radially_localised_time_series = generate_poloidally_averaged_time_series(phi2D_list)[:, radial_index].values;
 
-	if signal_high_pass:
-		# This typically needs to be employed for when the background profile has a trend of some kind.
-		radially_localised_time_series = butterworth_filter(radially_localised_time_series, time_step);
-
 	# Eventually we may need to modify this method's signature to accommodate different sampling frequencies.
-	sampling_frequency = calculate_sampling_frequency();
+	sampling_frequency = calculate_sampling_frequency(time_step = time_step);
 	time_range = np.arange(len(radially_localised_time_series)) / sampling_frequency;
 	envelope, residual_level = generate_residual_envelope(radially_localised_time_series);
 
@@ -90,7 +86,8 @@ def extract_gam_growth_rate(phi2D_list, time_step, radial_index, noise_threshold
 	pure_decay_signal = envelope - residual_level;
 	# Take only positive signal values prior to the tail of the signal to ensure well-behaved logarithmic fitting.
 	mask = pure_decay_signal > (noise_threshold * np.max(pure_decay_signal));
-	log_signal = convert_to_real_frequency(np.log(pure_decay_signal[mask]));
+	# This signal was originally converted to real frequency units (Hz).
+	log_signal = np.log(pure_decay_signal[mask]);
 	time_range_masked = time_range[mask];
 
 	# Fit a line to the logarithm of the envelope to extract the growth rate.
@@ -135,7 +132,7 @@ def generate_residual_envelope(radial_time_series, residual_window = 100, minimu
 	# Isolate peaks.
 	# The minimum distance between peaks here should actually be rigorously calculated using the sampling frequency.
 	# But in practice, we can post-hoc validate, with some ease, that this value works via the RH diagnostic.
-	# Unless the sampling frequency changes between runs, this value should work.
+	# TODO: we must fix this at some point...
 	peak_indices, _ = signal.find_peaks(radial_time_series, distance = minimum_peak_distance);
 
 	# Nonetheless, we can add a simple sanity check to make sure our lazy approach is still sensible...
@@ -265,16 +262,16 @@ def generate_poloidally_averaged_time_series(phirth_list, m1 = False):
 	time_series = xr.concat(radial_strips, dim = "time");
 	return time_series;
 
-def butterworth_filter(time_series, time_step, cutoff = 200):
+def butterworth_band_pass_filter(time_series, time_step, low_cutoff = 0.1, high_cutoff = 0.4, output_stride = 2):
 
-	# Determine sampling rate and Nyquist frequency in Hz.
-	# Presume micro-seconds for GYSELA's code timestep. This should probably be validated...
-	sampling_rate = 1.0 / (time_step * 1e-6);
+	# Determine sampling rate and Nyquist frequency in normalised units.
+	# Note that cutoff frequencies also therefore becomes normalised...
+	sampling_rate = calculate_sampling_frequency();
 	nyquist_frequency = 0.5 * sampling_rate;
-	normalised_cutoff = cutoff / nyquist_frequency;
+	normalised_cutoff_frequencies = [low_cutoff / nyquist_frequency, high_cutoff / nyquist_frequency];
 
 	# Denominator and numerator of the impulse response filter, respectively.
 	# We choose here a fourth order high-pass filter.
-	b, a = signal.butter(N = 4, Wn = normalised_cutoff, btype = "high");
+	b, a = signal.butter(N = 4, Wn = normalised_cutoff_frequencies, btype = "band");
 	filtered_signal = signal.filtfilt(b, a, time_series);
 	return filtered_signal;
