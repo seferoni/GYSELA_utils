@@ -50,19 +50,26 @@ normalisation_parameters = {
 # -------- Radial propagation/PSD & FFT helper functions. -----------
 # -------------------------------------------------------------------
 
-def calculate_sampling_frequency(output_stride = 2, time_step = 25):
-
+def calculate_sampling_frequency(output_stride = 2, delta_t = 25):
+	# TODO: phase this out
 	# The logic is this: we have 1 Phi2D file for every two time-steps (GSTEPS).
 	# So the diagnostic interval is two time-steps.
-	# `time_step` is simply delta_t. This can be read off from the simulation input file or from the output Phi2D files.
+	# `delta_t` is simply delta_t. This can be read off from the simulation input file or from the output Phi2D files.
 	# This still retains the normalisation interred within GYSELA itself.
-	diagnostic_time_step = time_step * output_stride;
-	return 1 / diagnostic_time_step;
+	diagnostic_delta_t = delta_t * output_stride;
+	return 1 / diagnostic_delta_t;
 
-def extract_gam_frequency(phi2D_list, time_step, radial_index, convert_to_real_frequency = False):
+def calculate_stride(delta_t, dt_diag):
+
+	# The logic is this: for a dt_diag of 50, and a delta_t of 25, we have a stride of 2.
+	# Stride is also the diagnostic interval; for every two simulation time-steps (50 code units), we have one Phi2D sample.
+	# This still retains the normalisation interred within GYSELA itself.
+	return dt_diag / delta_t;
+
+def extract_gam_frequency(phi2D_list, delta_t, radial_index, convert_to_real_frequency = False):
 
 	radial_time_series = generate_poloidally_averaged_time_series(phi2D_list);
-	frequencies, power_spectrum_density = map_power_spectrum(radial_time_series, radial_index, time_step);
+	frequencies, power_spectrum_density = map_power_spectrum(radial_time_series, radial_index, delta_t);
 	frequencies = convert_to_real_frequency(frequencies) if convert_to_real_frequency else frequencies;
 	GAM_peak_index = isolate_GAM_peak_index(power_spectrum_density, frequencies);
 	# We assume here that the peak corresponding to the GAM is the most prominent peak within the power spectrum.
@@ -71,14 +78,14 @@ def extract_gam_frequency(phi2D_list, time_step, radial_index, convert_to_real_f
 	GAM_frequency = frequencies[GAM_peak_index];
 	return GAM_frequency;
 
-def extract_gam_growth_rate(phi2D_list, time_step, radial_index, frequency, noise_threshold = 0.05, output_stride = 2):
-
+def extract_gam_growth_rate(phi2D_list, delta_t, dt_diag, radial_index, frequency, noise_threshold = 0.05):
+	# TODO: needs testing.
+	# TODO: needs to be able to isolate the physical part of the signal only.
 	radially_localised_time_series = generate_poloidally_averaged_time_series(phi2D_list)[:, radial_index].values;
+	stride = calculate_stride(delta_t, dt_diag);
 
-	# Eventually we may need to modify this method's signature to accommodate different sampling frequencies.
-	sampling_frequency = calculate_sampling_frequency(output_stride, time_step);
-	time_range = np.arange(len(radially_localised_time_series)) / sampling_frequency;
-	envelope, residual_level = generate_residual_envelope(radially_localised_time_series, time_step, frequency, output_stride = output_stride);
+	time_range = np.arange(len(radially_localised_time_series)) * stride;
+	envelope, residual_level = generate_residual_envelope(radially_localised_time_series, frequency, dt_diag);
 
 	# The residual level (should) behave as a static vertical offset. 
 	# By subtracting it from the envelope, we can isolate the pure decay signal.
@@ -93,7 +100,7 @@ def extract_gam_growth_rate(phi2D_list, time_step, radial_index, frequency, nois
 	growth_rate, _ = np.polyfit(time_range_masked, log_signal, 1);
 	return growth_rate;
 
-def map_power_spectrum(time_series, radial_index, time_step, padding_factor = 5):
+def map_power_spectrum(time_series, radial_index, delta_t, padding_factor = 5):
 
 	# Slice at radial index to isolate a strong signal.
 	signal = time_series.sel(r = radial_index);
@@ -111,7 +118,7 @@ def map_power_spectrum(time_series, radial_index, time_step, padding_factor = 5)
 	power_spectrum_density = np.abs(signal_fourier) ** 2;
 	
 	# Generate actual frequency data.
-	frequencies = fftfreq(padded_signal_steps, time_step);
+	frequencies = fftfreq(padded_signal_steps, delta_t);
 
 	# Preserve positive frequencies.
 	mask = frequencies > 0;
@@ -123,18 +130,17 @@ def convert_to_real_frequency(frequency_term):
 	real_normalisation_coeff = normalisation_parameters["thermal_velocity"] / geometry["major_radius"];
 	return frequency_term * dimensionless_normalisation_coeff * real_normalisation_coeff;
 
-def generate_residual_envelope(radial_time_series, time_step, frequency, residual_window = 100, output_stride = 2):
-
+def generate_residual_envelope(radial_time_series, frequency, dt_diag, residual_window = 100):
+	# TODO: this is also actually not correctly calculating the residual level!!! because we have the non-physical tail...
 	# Isolate a given number of entries in the time series as the residual. Arbitrary.
 	residual_level = np.mean(radial_time_series[-residual_window:]);
-	
-	# Isolate peaks.
-	minimum_distance = (1 / frequency) * 0.5 * (1 / time_step);
-	peak_indices, _ = signal.find_peaks(radial_time_series, distance = minimum_distance);
-
+	# The GAM period is first converted into time-steps (GSTEPS), and then halved for the peak-to-peak distance.
+	minimum_distance = 0.5 * (1 / frequency) * (1 / dt_diag);
+	peak_indices, _ = signal.find_peaks(radial_time_series, distance = minimum_distance, prominence = np.max(radial_time_series) * 0.01);
 	peaks = radial_time_series[peak_indices];
-	peak_times = np.arange(len(radial_time_series));
-	envelope = interp1d(peak_indices, peaks, kind = "linear", bounds_error = False, fill_value = (peaks[0], peaks[-1]))(peak_times);
+	# This is so-called 'virtual' because it corresponds to the diagnostic time-scale (by which Phi2D files are sampled).
+	virtual_peak_times = np.arange(len(radial_time_series));
+	envelope = interp1d(peak_indices, peaks, kind = "linear", bounds_error = False, fill_value = (peaks[0], peaks[-1]))(virtual_peak_times);
 	return envelope, residual_level;
 
 def isolate_GAM_peak_index(power_spectrum_density, frequency_array, cutoff = 0.001):
@@ -211,11 +217,11 @@ def parameter_scan_analysis_phi2D(base_directory, folder_prefix, radial_index):
 	
 		# Load phi2D data.
 		phi2D_list = reader.compile_data_from_directory("Phirth_n0", f"{directory}/sp0/Phi2D");
-		time_step = reader.fetch_data_from_h5(f"{directory}/sp0/Phi2D/Phi2D_d00000.h5")["deltat"].values;
+		delta_t = reader.fetch_data_from_h5(f"{directory}/sp0/Phi2D/Phi2D_d00000.h5")["deltat"].values;
 	
 		# Process Phi2D data. We preserve GYSELA's normalisation convention (to the ion cyclotron frequency).
-		gam_frequency = extract_gam_frequency(phi2D_list, time_step, radial_index);
-		gam_growth_rate = extract_gam_growth_rate(phi2D_list, time_step, radial_index, gam_frequency);
+		gam_frequency = extract_gam_frequency(phi2D_list, delta_t, radial_index);
+		gam_growth_rate = extract_gam_growth_rate(phi2D_list, delta_t, radial_index, gam_frequency);
 	
 		# Store results as a table.
 		results.append({
@@ -254,11 +260,11 @@ def generate_poloidally_averaged_time_series(phirth_list, m1 = False):
 	time_series = xr.concat(radial_strips, dim = "time");
 	return time_series;
 
-def butterworth_band_pass_filter(time_series, time_step, low_cutoff = 0.0005, high_cutoff = 0.0025, output_stride = 2):
+def butterworth_band_pass_filter(time_series, delta_t, low_cutoff = 0.0005, high_cutoff = 0.0025, output_stride = 2):
 
 	# Determine sampling rate and Nyquist frequency in normalised units.
 	# Note that cutoff frequencies also therefore becomes normalised...
-	sampling_rate = calculate_sampling_frequency(output_stride, time_step);
+	sampling_rate = calculate_sampling_frequency(output_stride, delta_t);
 	nyquist_frequency = 0.5 * sampling_rate;
 	normalised_cutoff_frequencies = [low_cutoff / nyquist_frequency, high_cutoff / nyquist_frequency];
 
