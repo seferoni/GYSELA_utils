@@ -7,7 +7,7 @@ import gysela_utilities as utils;
 # Styling.
 plt.style.use("ggplot");
 
-def plot_power_spectrum_density(phi2D_list, delta_t, effective_radius, figure_title, filename, ):
+def plot_power_spectrum_density(phi2D_list, delta_t, effective_radius, figure_title, filename):
 
 	# Signal isolation and data processing.
 	# Logic here is similar to that of `extract_GAM_frequency` in the utilities.

@@ -50,12 +50,49 @@ normalisation_parameters = {
 # -------- Radial propagation/PSD & FFT helper functions. -----------
 # -------------------------------------------------------------------
 
+def calculate_physical_envelope_indices(damping_envelope):
+	# We work in indices here - so output stride is immaterial.
+	# Presuming no evolving background profile, this lets us skip the initial transients/positive growth rate phase.
+	start_index = np.argmax(damping_envelope);
+	long_time_signal = damping_envelope[start_index :];
+
+	consecutive_differences = np.diff(long_time_signal);
+	# Returns a tuple of arrays.
+	turning_points = np.where(consecutive_differences > 0);
+
+	# For the edge case where the GAM damps perfectly.
+	if len(turning_points) == 0:
+		return [start_index, len(damping_envelope) -1];
+
+	# We index the zeroth element of the zeroth array.
+	end_index = start_index + turning_points[0][0];
+	return [start_index, end_index];
+
+def calculate_residual_level(damping_envelope, residual_window = 100, search_start_index = 100):
+
+	# Get time-index corresponding to first minimum, which should mark the end of the physical signal.
+	end_index = np.argmin(damping_envelope[search_start_index :]);
+
+	if (residual_window > end_index):
+		print(f"Error: Residual window value {residual_window} is greater than the number of indices before the first minima occurs {end_index}.");
+		return None;
+
+	start_index = end_index - residual_window;
+	residual_level = np.median(damping_envelope[start_index : end_index]);
+	return residual_level;
+
 def calculate_stride(delta_t, dt_diag):
 
 	# The logic is this: for a dt_diag of 50, and a delta_t of 25, we have a stride of 2.
 	# Stride is also the diagnostic interval; for every two simulation time-steps (50 code units), we have one Phi2D sample.
 	# This still retains the normalisation interred within GYSELA itself.
 	return dt_diag / delta_t;
+
+def convert_to_real_frequency(frequency_term):
+
+	dimensionless_normalisation_coeff = normalisation_parameters["normalisation_coeff_gys"];
+	real_normalisation_coeff = normalisation_parameters["thermal_velocity"] / geometry["major_radius"];
+	return frequency_term * dimensionless_normalisation_coeff * real_normalisation_coeff;
 
 def extract_gam_frequency(phi2D_list, delta_t, effective_radius = 0.7, real_frequency = False):
 
@@ -69,25 +106,56 @@ def extract_gam_frequency(phi2D_list, delta_t, effective_radius = 0.7, real_freq
 	GAM_frequency = frequencies[GAM_peak_index];
 	return GAM_frequency;
 
-def extract_gam_growth_rate(phi2D_list, delta_t, dt_diag, frequency, effective_radius = 0.7, noise_threshold = 0.05):
-	# TODO: needs testing.
-	# TODO: needs to be able to isolate the physical part of the signal only.
+def extract_gam_growth_rate(phi2D_list, delta_t, dt_diag, frequency, effective_radius = 0.7, residual_window = 100, noise_threshold = 0.05):
+	# TODO: not as robust as the filtered method. needs revisions probably
 	radially_localised_time_series = generate_poloidally_averaged_time_series(phi2D_list, effective_radius);
 	stride = calculate_stride(delta_t, dt_diag);
 
-	time_range = np.arange(len(radially_localised_time_series)) * stride;
-	envelope, residual_level = generate_damping_envelope(radially_localised_time_series, frequency, dt_diag);
+	envelope = generate_damping_envelope(radially_localised_time_series, frequency, dt_diag);
+	# Truncate to ignore starting transients and noise 'echo'/tail.
+	truncation_indices = calculate_physical_envelope_indices(envelope);
+
+	indices_range = np.arange(len(radially_localised_time_series));
+	truncation_mask = (indices_range >= truncation_indices[0]) & (indices_range <= truncation_indices[1]);
+	truncated_envelope = envelope[truncation_mask];
+	# Scale up to GYSELA time-steps, which matters strictly for the output value of the growth rate.
+	time_range_masked = indices_range[truncation_mask] * stride;
 
 	# The residual level (should) behave as a static vertical offset. 
+	residual_level = calculate_residual_level(truncated_envelope, residual_window);
 	# By subtracting it from the envelope, we can isolate the pure decay signal.
-	pure_decay_signal = envelope - residual_level;
+	pure_decay_signal = truncated_envelope - residual_level;
 	# Take only positive signal values prior to the tail of the signal to ensure well-behaved logarithmic fitting.
 	mask = pure_decay_signal > (noise_threshold * np.max(pure_decay_signal));
 	# This signal was originally converted to real frequency units (Hz). Here, we keep code units.
 	log_signal = np.log(pure_decay_signal[mask]);
-	time_range_masked = time_range[mask];
 
-	# Fit a line to the logarithm of the envelope to extract the growth rate.
+	# Polyfit returns the slope and intercept as its first and second return values, respectively.
+	growth_rate, _ = np.polyfit(time_range_masked, log_signal, 1);
+	return growth_rate;
+
+def extract_gam_growth_rate_filtered(phi2D_list, delta_t, dt_diag, frequency, effective_radius = 0.7, cutoff_frequencies = [0.0005, 0.0025]):
+
+	radially_localised_time_series = generate_poloidally_averaged_time_series(phi2D_list, effective_radius);
+	filtered_signal = butterworth_band_pass_filter(radially_localised_time_series, dt_diag, cutoff_frequencies[0], cutoff_frequencies[1]);
+	stride = calculate_stride(delta_t, dt_diag);
+
+	envelope = generate_damping_envelope(filtered_signal, frequency, dt_diag);
+	# Truncate to ignore starting transients and noise 'echo'/tail.
+	truncation_indices = calculate_physical_envelope_indices(envelope);
+
+	indices_range = np.arange(len(filtered_signal));
+	truncation_mask = (indices_range >= truncation_indices[0]) & (indices_range <= truncation_indices[1]);
+	truncated_envelope = envelope[truncation_mask];
+	# Scale up to GYSELA time-steps, which matters strictly for the output value of the growth rate.
+	time_range_masked = indices_range[truncation_mask] * stride;
+
+	# Mitigate cases where the band-pass produces an envelope that dips below the zero-line.
+	# This should not generally be possible but is kept as a safeguard.
+	log_signal = np.log(truncated_envelope[truncated_envelope > 0]);
+	time_range_masked = time_range_masked[truncated_envelope > 0];
+
+	# Polyfit returns the slope and intercept as its first and second return values, respectively.
 	growth_rate, _ = np.polyfit(time_range_masked, log_signal, 1);
 	return growth_rate;
 
@@ -111,31 +179,6 @@ def map_power_spectrum(radial_time_series, delta_t, padding_factor = 5):
 	# Preserve positive frequencies.
 	mask = frequencies > 0;
 	return frequencies[mask], power_spectrum_density[mask];
-
-def slice_at_effective_radius(radial_time_series, effective_radius = 0.7):
-
-	total_radial_size = radial_time_series.sizes["r"] - 1;
-	radial_index = round(effective_radius * total_radial_size);
-	return radial_time_series[:, radial_index].values;
-
-def calculate_residual_level(damping_envelope, residual_window = 100, search_start_index = 100):
-
-	# Get time-index corresponding to first minimum, which should mark the end of the physical signal.
-	first_minimum_end_index = np.argmin(damping_envelope[search_start_index :]);
-
-	if (residual_window > first_minimum_end_index):
-		print(f"Error: Residual window value {residual_window} is greater than the number of indices before the first minima occurs {first_minimum_end_index}.");
-		return None;
-
-	first_minimum_start_index = first_minimum_end_index - residual_window;
-	residual_level = np.median(damping_envelope[first_minimum_start_index : first_minimum_end_index]);
-	return residual_level;
-
-def convert_to_real_frequency(frequency_term):
-
-	dimensionless_normalisation_coeff = normalisation_parameters["normalisation_coeff_gys"];
-	real_normalisation_coeff = normalisation_parameters["thermal_velocity"] / geometry["major_radius"];
-	return frequency_term * dimensionless_normalisation_coeff * real_normalisation_coeff;
 
 def generate_damping_envelope(radial_time_series, frequency, dt_diag):
 
@@ -172,6 +215,12 @@ def isolate_GAM_peak_index(power_spectrum_density, frequency_array, cutoff = 0.0
 	GAM_peak_index = peak_indices[np.argmax(peaks)];
 	return GAM_peak_index;
 
+def slice_at_effective_radius(radial_time_series, effective_radius = 0.7):
+
+	total_radial_size = radial_time_series.sizes["r"] - 1;
+	radial_index = round(effective_radius * total_radial_size);
+	return radial_time_series[:, radial_index].values;
+
 # -------------------------------------------------------------------
 # ------------------- Mesh grid generation. -------------------------
 # -------------------------------------------------------------------
@@ -206,6 +255,7 @@ def generate_xy_grid(phi2D_dataset):
 
 def parameter_scan_analysis_phi2D(base_directory, folder_prefix, dt_diag, effective_radius):
 	# TODO: need to incorporate band pass filter here
+	# TODO: this is also inefficient
 	# `folder_prefix` should be of the form "DN_*_*_[parameter value]" (DN is the standard GYSELA format, not necessarily invoked here).
 	search_pattern = os.path.join(base_directory, f"{folder_prefix}_*");
 	# Match search pattern, return list in ascending order.
