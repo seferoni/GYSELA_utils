@@ -12,7 +12,7 @@ def plot_rosenbluth_hinton(phi2D_list, radial_index, filename, figure_title):
 	# Signal isolation and data processing.
 	time_series = utils.generate_poloidally_averaged_time_series(phi2D_list)[:, radial_index].values;
 	time_range = np.arange(len(time_series));
-	amplitude_envelope, residual_level = utils.generate_residual_envelope(time_series);
+	amplitude_envelope, residual_level = utils.generate_damping_envelope(time_series);
 
 	# Figure plotting logic.
 	plt.figure(figsize = (10, 5));

@@ -7,13 +7,13 @@ import gysela_utilities as utils;
 # Styling.
 plt.style.use("ggplot");
 
-def plot_power_spectrum_density(phi2D_list, time_step, radial_index, figure_title, filename):
+def plot_power_spectrum_density(phi2D_list, delta_t, effective_radius, figure_title, filename, ):
 
 	# Signal isolation and data processing.
 	# Logic here is similar to that of `extract_GAM_frequency` in the utilities.
-	radial_time_series = utils.generate_poloidally_averaged_time_series(phi2D_list);
-	frequencies, power_spectrum_density = utils.map_power_spectrum(radial_time_series, radial_index, time_step);
-	frequencies = utils.convert_to_real_frequency(frequencies)/(2 * np.pi);
+	radial_time_series = utils.generate_poloidally_averaged_time_series(phi2D_list, effective_radius);
+	frequencies, power_spectrum_density = utils.map_power_spectrum(radial_time_series, delta_t);
+	frequencies = utils.convert_to_real_frequency(frequencies);
 	GAM_peak_index = utils.isolate_GAM_peak_index(power_spectrum_density, frequencies);
 	GAM_frequency = frequencies[GAM_peak_index];
 	GAM_power = float(power_spectrum_density[GAM_peak_index]);
@@ -30,7 +30,7 @@ def plot_power_spectrum_density(phi2D_list, time_step, radial_index, figure_titl
 	plt.title(figure_title);
 	IO.save_figure(filename);
 
-def main(phi2D_list, time_step, radial_index, filename, figure_title = r"PSD of $\langle \Phi \rangle_\theta$ ($m = n = 0$)"):
+def main(phi2D_list, delta_t, effective_radius, filename, figure_title = r"PSD of $\langle \Phi \rangle_\theta$ ($m = n = 0$)"):
 
 	# Entry point for `diagnostics_main.py`.
-	plot_power_spectrum_density(phi2D_list, time_step, radial_index, figure_title, filename);
+	plot_power_spectrum_density(phi2D_list, delta_t, effective_radius, figure_title, filename);
