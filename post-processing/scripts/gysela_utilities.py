@@ -41,9 +41,12 @@ simulation_parameters = {
 };
 
 normalisation_parameters = {
-
 	"thermal_velocity" : np.sqrt(simulation_parameters["ion_temperature_joules"] / simulation_parameters["ion_mass"]),
 	"normalisation_coeff_gys" : geometry["aspect_ratio_gys"] / (simulation_parameters["rhostar_gys"] * np.sqrt(2.))
+};
+
+convenience_parameters = {
+	"GAM_cutoff_frequencies_template" : [0.0005, 0.0025]
 };
 
 # -------------------------------------------------------------------
@@ -253,9 +256,8 @@ def generate_xy_grid(phi2D_dataset):
 # ------------------- Batch/parameter scan logic. -------------------
 # -------------------------------------------------------------------
 
-def parameter_scan_analysis_phi2D(base_directory, folder_prefix, dt_diag, effective_radius):
-	# TODO: need to incorporate band pass filter here
-	# TODO: this is also inefficient
+def parameter_scan_analysis_phi2D(base_directory, folder_prefix, dt_diag, effective_radius, cutoff_frequencies = None):
+	# TODO: this is inefficient
 	# `folder_prefix` should be of the form "DN_*_*_[parameter value]" (DN is the standard GYSELA format, not necessarily invoked here).
 	search_pattern = os.path.join(base_directory, f"{folder_prefix}_*");
 	# Match search pattern, return list in ascending order.
@@ -283,7 +285,11 @@ def parameter_scan_analysis_phi2D(base_directory, folder_prefix, dt_diag, effect
 	
 		# Process Phi2D data. We preserve GYSELA's normalisation convention (to the ion cyclotron frequency).
 		gam_frequency = extract_gam_frequency(phi2D_list, delta_t, effective_radius);
-		gam_growth_rate = extract_gam_growth_rate(phi2D_list, delta_t, dt_diag, effective_radius, gam_frequency);
+		
+		if cutoff_frequencies is not None:
+			gam_growth_rate = extract_gam_growth_rate_filtered(phi2D_list, delta_t, dt_diag, gam_frequency, effective_radius, cutoff_frequencies);
+		else:
+			gam_growth_rate = extract_gam_growth_rate(phi2D_list, delta_t, dt_diag, effective_radius, gam_frequency);
 	
 		# Store results as a table.
 		results.append({
