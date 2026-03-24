@@ -6,6 +6,7 @@ import h5_reader_xr as reader;
 import os;
 import glob;
 from scipy import signal;
+from scipy import stats;
 from scipy.interpolate import interp1d;
 from scipy.fft import fft, fftfreq;
 
@@ -53,22 +54,62 @@ convenience_parameters = {
 # -------- Radial propagation/PSD & FFT helper functions. -----------
 # -------------------------------------------------------------------
 
-def calculate_physical_envelope_indices(damping_envelope):
-	# We work in indices here - so output stride is immaterial.
-	# Presuming no evolving background profile, this lets us skip the initial transients/positive growth rate phase.
-	start_index = np.argmax(damping_envelope);
-	long_time_signal = damping_envelope[start_index :];
+def calculate_physical_envelope_indices(damping_envelope, frequency, dt_diag, correlation_threshold = 0.95):
 
+	# Presuming no evolving background profile, this lets us skip the initial transients/positive growth rate phase.
+	nominal_start_index = np.argmax(damping_envelope);
+	# Convert from code units to diagnostic indices - not GYSELA time-steps!
+	diagnostic_period = int((1 / frequency) * (1 / dt_diag));
+	# Note always that time-steps are a visual abstraction.
+	# As a rule of thumb, the period we extract here MUST be half of the 'visual' period if dt_diag = 50, delta_t = 25.
+	start_index = None;
+	
+	for period_multiplier in np.arange(1, 7):
+
+		test_start = nominal_start_index + (period_multiplier * diagnostic_period);
+		# Look two periods ahead in index-space.
+		test_end = test_start + (2 * diagnostic_period);
+		test_segment = damping_envelope[test_start : test_end];
+
+		# Linearity test to find asymptotic regime.
+		log_segment = np.log(test_segment);
+		segment_range = np.arange(len(log_segment));
+		results = stats.linregress(segment_range, log_segment);
+		# The closer this is to 1, the more linearly correlated the points are.
+		pearson_correlation = results.rvalue ** 2;
+	
+		# We also omit here consecutive segments with a positive slope.
+		if pearson_correlation < correlation_threshold or results.slope >= 0:
+			continue;
+	
+		start_index = test_start;
+		break;
+	
+	if start_index is None:
+		print("Error: could not find asymptotic regime!");
+		return None;
+	
+	window_length = int(0.5 * diagnostic_period);
+
+	if window_length % 2 == 0:
+		# Window length must be odd.
+		window_length += 1;
+
+	# We cull the numerical jitters and noise via a Savitzky-Golay filter.
+	smoothed_envelope = signal.savgol_filter(damping_envelope, window_length, polyorder = 2);
+	long_time_signal = smoothed_envelope[start_index :];
 	consecutive_differences = np.diff(long_time_signal);
-	# Returns a tuple of arrays.
-	turning_points = np.where(consecutive_differences > 0);
+	# Returns a tuple of arrays. We take the zeroth array.
+	turning_points = np.where(consecutive_differences > np.mean(damping_envelope) * 0.001)[0];
+	# Ordinarily we'd take `consecutive_differences > 0`, but this is too still too sensitive to small abrupt changes in the envelope.
+	# So here, we look at fluctuations ostensibly larger than noise.
 
 	# For the edge case where the GAM damps perfectly.
 	if len(turning_points) == 0:
 		return [start_index, len(damping_envelope) -1];
 
-	# We index the zeroth element of the zeroth array.
-	end_index = start_index + turning_points[0][0];
+	end_index = start_index + turning_points[0];
+	print(start_index, end_index)
 	return [start_index, end_index];
 
 def calculate_residual_level(damping_envelope, residual_window = 100, search_start_index = 100):
@@ -98,7 +139,7 @@ def convert_to_real_frequency(frequency_term):
 	return frequency_term * dimensionless_normalisation_coeff * real_normalisation_coeff;
 
 def extract_gam_frequency(phi2D_list, delta_t, effective_radius = 0.7, real_frequency = False):
-
+	# TODO: i think this is fucked.
 	radial_time_series = generate_poloidally_averaged_time_series(phi2D_list, effective_radius);
 	frequencies, power_spectrum_density = map_power_spectrum(radial_time_series, delta_t);
 	frequencies = convert_to_real_frequency(frequencies) if real_frequency else frequencies;
@@ -116,7 +157,7 @@ def extract_gam_growth_rate(phi2D_list, delta_t, dt_diag, frequency, effective_r
 
 	envelope = generate_damping_envelope(radially_localised_time_series, frequency, dt_diag);
 	# Truncate to ignore starting transients and noise 'echo'/tail.
-	truncation_indices = calculate_physical_envelope_indices(envelope);
+	truncation_indices = calculate_physical_envelope_indices(envelope, frequency, dt_diag);
 
 	indices_range = np.arange(len(radially_localised_time_series));
 	truncation_mask = (indices_range >= truncation_indices[0]) & (indices_range <= truncation_indices[1]);
@@ -145,7 +186,7 @@ def extract_gam_growth_rate_filtered(phi2D_list, delta_t, dt_diag, frequency, ef
 
 	envelope = generate_damping_envelope(filtered_signal, frequency, dt_diag);
 	# Truncate to ignore starting transients and noise 'echo'/tail.
-	truncation_indices = calculate_physical_envelope_indices(envelope);
+	truncation_indices = calculate_physical_envelope_indices(envelope, frequency, dt_diag);
 
 	indices_range = np.arange(len(filtered_signal));
 	truncation_mask = (indices_range >= truncation_indices[0]) & (indices_range <= truncation_indices[1]);
@@ -162,7 +203,7 @@ def extract_gam_growth_rate_filtered(phi2D_list, delta_t, dt_diag, frequency, ef
 	growth_rate, _ = np.polyfit(time_range_masked, log_signal, 1);
 	return growth_rate;
 
-def map_power_spectrum(radial_time_series, delta_t, padding_factor = 5):
+def map_power_spectrum(radial_time_series, dt_diag, padding_factor = 5):
 
 	signal_steps = len(radial_time_series);
 
@@ -177,7 +218,7 @@ def map_power_spectrum(radial_time_series, delta_t, padding_factor = 5):
 	power_spectrum_density = np.abs(signal_fourier) ** 2;
 	
 	# Generate actual frequency data.
-	frequencies = fftfreq(padded_signal_steps, delta_t);
+	frequencies = fftfreq(padded_signal_steps, dt_diag);
 
 	# Preserve positive frequencies.
 	mask = frequencies > 0;
@@ -185,7 +226,8 @@ def map_power_spectrum(radial_time_series, delta_t, padding_factor = 5):
 
 def generate_damping_envelope(radial_time_series, frequency, dt_diag):
 
-	# The GAM period is first converted into time-steps (GSTEPS), and then halved for the peak-to-peak distance.
+	# The GAM period is first converted into diagonostic time-steps (corresponding strictly to indices)...
+	# and then halved for the peak-to-peak distance. We remain in index-space always, not time-steps.
 	minimum_distance = 0.5 * (1 / frequency) * (1 / dt_diag);
 	peak_indices, _ = signal.find_peaks(radial_time_series, distance = minimum_distance, prominence = np.max(radial_time_series) * 0.01);
 	peaks = radial_time_series[peak_indices];
@@ -201,7 +243,7 @@ def generate_time_range_by_series(radial_time_series, delta_t, dt_diag):
 	stride = calculate_stride(delta_t, dt_diag);
 	return naive_range * stride;
 
-def isolate_GAM_peak_index(power_spectrum_density, frequency_array, cutoff = 0.001):
+def isolate_GAM_peak_index(power_spectrum_density, frequency_array, cutoff = 0.0005):
 
 	frequency_mask = frequency_array > cutoff;
 	# Vacates the indexed value when the frequency is below the cutoff, effectively ignoring low frequency (ZFZF) peaks.
@@ -209,9 +251,9 @@ def isolate_GAM_peak_index(power_spectrum_density, frequency_array, cutoff = 0.0
 	# This may need a little fine-tuning, prominence-wise, depending on the intensity of turbulence in the system.
 	peak_indices, _ = signal.find_peaks(high_frequency_psd, prominence = high_frequency_psd.max() * 0.2);
 
-	if not peak_indices:
+	if len(peak_indices) == 0:
 
-		print(f"No peaks detected above the designated cutoff: {cutoff} Hz.");
+		print(f"No peaks detected above the designated cutoff: {cutoff}.");
 		return None;
 
 	peaks = high_frequency_psd[peak_indices];
