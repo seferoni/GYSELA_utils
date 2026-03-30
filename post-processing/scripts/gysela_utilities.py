@@ -139,7 +139,7 @@ def convert_to_real_frequency(frequency_term):
 	return frequency_term * dimensionless_normalisation_coeff * real_normalisation_coeff;
 
 def extract_gam_frequency(phi2D_list, delta_t, effective_radius = 0.7, real_frequency = False):
-	# TODO: i think this is fucked.
+
 	radial_time_series = generate_poloidally_averaged_time_series(phi2D_list, effective_radius);
 	frequencies, power_spectrum_density = map_power_spectrum(radial_time_series, delta_t);
 	frequencies = convert_to_real_frequency(frequencies) if real_frequency else frequencies;
