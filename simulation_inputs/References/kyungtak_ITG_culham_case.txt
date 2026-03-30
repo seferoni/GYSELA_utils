@@ -1,0 +1,202 @@
+#******************************************
+# job parameters
+#******************************************
+NB_RESTART   = 0
+TIME         = 06:00:00
+MACHINE_FILE =
+JOBNAME      = elong_ITG
+
+#*******************************************
+#  Variables used to specify if the
+#   simulation is a restart from
+#   another one
+#*******************************************
+SEARCH_SP0   = 0           ! 0 if no restart, 1 otherwise
+DIR_SP0      = /home/users/ntu/kyungtak/scratch/gysela/DN_ITG_TEST           ! if SEARCH_SP0=1, name of the directory
+                                                                                  !   containing the major species restart files
+
+#*******************************************
+#  Variables for parallelization
+#*******************************************
+NSPECIES = 1
+NPROC_R  = 2
+NPROC_TH = 4
+NPROC_MU = 32
+NTHREAD  = 12
+
+#*******************************************
+#  Variables for radial profile input files
+#*******************************************
+ns0_sp0_filename    = ns0_sp0_test.dat
+ns0_sp1_filename    = ns0_sp1_test.dat
+Ts0_sp0_filename    = Ts0_sp0_test.dat
+Ts0_sp1_filename    = Ts0_sp1_test.dat
+q_filename          = safety_factor_test.dat
+Vpars0_sp0_filename = Vpar0_sp0_test.dat
+Vpars0_sp1_filename = Vpar0_sp1_test.dat
+ripple_filename     = ripple_constant.h5
+
+#******************************************
+# gysela input datas
+#******************************************
+&PARALLEL
+  Nspecies       = $NSPECIES
+  Nbproc_r       = $NPROC_R
+  Nbproc_theta   = $NPROC_TH
+  Nbproc_mu      = $NPROC_MU
+  Nbthread       = $NTHREAD
+/
+
+&MESH
+  Nr                  = 127
+  Ntheta              = 256
+  Nphi                = 64
+  Nvpar               = 127
+  Nmu                 = $((NPROC_MU-1))
+  minor_radius        = 180.
+  rhomin              = 0.
+  rhomax              = 1.15
+  Ltheta              = 6.283185307179586476925286766559005768394
+  Lphi                = 3.141592653589793238462643383279502884197
+  aspect_ratio        = 3.0
+  nb_vth0             = 6.
+  Lmu                 = 18.
+  mumin               = 0.,
+/
+
+&EQUIL
+! Define the choice for electrons
+!  0 = "ADIABATIC"
+!  1 = "FULL-KINETIC"
+!  2 = "TRAPPED-KINETIC"
+  electron_type              = 0
+! We consider as kinetic only the trapped electrons which have
+!  a maximum parallel velocity so that
+!   |vpar/vperp| < sqrt(2*eps)*kineticTE_coeff
+  kineticTE_coeff            = 1.
+! The possible choices for the equilibrium distribution function are:
+!   1 = "MAXWELLIAN"[default]
+!   2 = "ENERGETIC_PARTICLES"
+  fequilibrium_type          = 1
+  tau0                       = 1.
+  A0                         = 1.
+  Z0                         = 1.
+  As                         = 1.
+  Zs                         = 1.
+  species_frac               = 1.
+  read_ns0                   = .false.
+  read_Ts0                   = .false.
+  read_q                     = .false.
+  read_Vpars0                = .false.
+  profile_choice             = 4
+  rpeak                      = 0.5
+  kappa_ns0                  = 2.22 ! density gradient
+  kappa_Ts0                  = 7.5 ! temperature gradient
+  deltar_ns0                 = 0.3
+  deltar_Ts0                 = 0.3
+  Vpars0                     = 0.
+  q_profile                  = 4
+  q_param1                   = 0.854
+  q_param2                   = 0
+  q_param3                   = 2.184
+  q_param4                   = 0.
+  magnetic_drift             = .true.
+  perturb_choice             = 8
+  perturb_amplitude          = 0.000001
+  m                          = 20
+  n                          = 14
+  magnet_strategy          = "CULHAM"
+  kappa_elongation           = 1.2
+  delta_triangularity        = 0
+  beta_toro                  = 0.0
+  !--> Gyroaverage tunable input parameters
+  gyroaverage                = .true.
+  gyro_Nbpoints              = 7
+  TF_ripple                  = .false.
+  N_ripple                   = 0,
+/
+
+&COLLISION_OPERATOR
+  collision_strategy = "NONE" ! ("DEFAULT", "NONE", "GENERAL")
+  nustar          = 0.1
+  coll_nbstep     = 2,
+/
+
+&BUFFER_REGION
+  coef_diffr             = 0.0
+  coef_diffth            = 0.0
+  buffer_asymmetry       = .false.
+  right_buffer_only      = .true.
+  buffer_location        = 0.1
+  buffer_stiffness       = 0.025
+  SOL                    = .true.
+  SOL_separatrix         = 1.0
+  SOL_stiffness          = 0.07
+  SOL_exp_decay          = 1.e-3,
+  SOL_krook_coeff        = 0.1
+/
+
+&LIMITER
+  LIM                      = .false.
+  LIM_rseparatrix          = 1.0
+  LIM_theta_position       = 4.71238898038469
+  LIM_deltath              = 1.9
+  LIM_WALL_rposition       = 1.26
+  LIM_flat                 = .true.
+  LIM_round                = .false.
+  LIM_curvature            = 0.
+  LIM_stiff_r              = 0.005
+  LIM_stiff_theta          = 0.03
+  ! limiter options
+  LIM_phi_bias             = 0.
+  LIM_lambda_coeff         = 1.
+/
+
+&ALGORITHM
+  Vlasov_scheme = "BSL"
+  aligned_strategy = "NONE"
+  skiphole         = .true.
+  FFTpotential_filter        = 0
+  FFTpotential_filter_deltam = 200.
+  deltat        = 25.
+  nbiter        = 2000
+  dt_diag       = 250.
+/
+
+&SOURCE
+  flux_driven     = .true.
+  heat_source     = .true.
+  heat_version    = 0
+  Sce0            = 0.01
+  TS              = 1.0
+  rhoS            = 0.1
+  LS              = 0.1
+/
+
+&TEST
+  !--> Tests for QN solver
+  solve_QN             = .true.
+  !--> Tests for RHS of Boltzmann equation
+  RHS_only             = .false.
+  !--> Tests with simplified physics
+  BstareqB             = .false.
+  single_m             = .false.
+  single_n             = .false.
+  remove_n0            = .false.
+  Rosenbluth_Hinton    = .false.
+  !--> Tests for computer sciences
+  modulo_restart_iter  = 100
+/
+
+&OUTPUT
+  integration_CS       = .true.
+  diag_level           = 8
+  Phi3D_saving         = .true.
+  Moments3D_saving     = .false.
+  fluxes3D_GC_saving   = .false.
+  f5D_saving           = .false.
+  Phi3D_dt_diag        = 20000.
+  Moments3D_dt_diag    = 1000.
+  fluxes3D_GC_dt_diag  = 1000.
+  f5D_dt_diag          = 5000.
+/
