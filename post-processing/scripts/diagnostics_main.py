@@ -4,7 +4,7 @@ import sys;
 import pathlib;
 import diagnostics;
 import IO_utilities as IO;
-import gysela_utilities as utils;
+import phi2D_utilities as utils;
 
 # Variables.
 sugared_diagnostic_names = {

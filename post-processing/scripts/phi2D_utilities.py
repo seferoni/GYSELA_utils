@@ -15,7 +15,7 @@ from scipy.fft import fft, fftfreq;
 # -------------------------------------------------------------------
 
 # The variables below are nominally private - not to be altered during run-time!
-# Sourced from GAM_analytical.py. Veracity is... dubious. Should double-check at some point...
+# Sourced from GAM_analytical.py.
 
 physical_constants = {
 	"electron_volt" : 1.602176634e-19, # In Joules.
@@ -55,7 +55,7 @@ convenience_parameters = {
 # -------------------------------------------------------------------
 
 def calculate_physical_envelope_indices(damping_envelope, frequency, dt_diag, correlation_threshold = 0.95):
-
+	# TODO: this is very overengineered and will be of no use for a purely physical GAM signal (uncontaminated by Vlasov recurrence)
 	# Presuming no evolving background profile, this lets us skip the initial transients/positive growth rate phase.
 	nominal_start_index = np.argmax(damping_envelope);
 	# Convert from code units to diagnostic indices - not GYSELA time-steps!
@@ -322,8 +322,8 @@ def parameter_scan_analysis_phi2D(base_directory, folder_prefix, dt_diag, effect
 		print(f"Processing {folder_basename} with parameter value: {parameter_value}");
 	
 		# Load phi2D data.
-		phi2D_list = reader.compile_data_from_directory("Phirth_n0", f"{directory}/sp0/Phi2D");
-		delta_t = reader.fetch_data_from_h5(f"{directory}/sp0/Phi2D/Phi2D_d00000.h5")["deltat"].values;
+		phi2D_list = reader.fetch_phi2D_data(directory);
+		delta_t = reader.fetch_delta_t(directory);
 	
 		# Process Phi2D data. We preserve GYSELA's normalisation convention (to the ion cyclotron frequency).
 		gam_frequency = extract_gam_frequency(phi2D_list, delta_t, effective_radius);

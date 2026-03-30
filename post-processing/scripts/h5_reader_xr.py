@@ -15,16 +15,26 @@ def compile_data_from_directory(data_key, nominal_path, to_numpy = False):
 
 	return data_arrays;
 
-def fetch_data_from_h5(filepath):
+def fetch_data_from_h5(filepath, dimensions = None):
 
 	# If xarray complains (as it is often wont to do), changing the engine can help.
 	dataset = xr.open_dataset(filepath, engine = "h5netcdf", phony_dims = "sort");
 
-	# We match each `phony_dim` by comparing array sizes.
-	dataset = dataset.rename(phony_dim_0 = "zeta", phony_dim_1 = "r", phony_dim_2 = "theta").load();
+	if dimensions is not None:
+		# We match each `phony_dim` by comparing array sizes.
+		dataset = dataset.rename(phony_dim_0 = dimensions[0], phony_dim_1 = dimensions[1], phony_dim_2 = dimensions[2]).load();
+
 	# Discard size-1 dimensions.
 	dataset = dataset.squeeze();
 	return dataset;
+
+def fetch_phi2D_data_from_h5(filepath, dataset_key = "Phirth_n0"):
+
+	return fetch_data_from_h5(filepath, dimensions = ["zeta", "r", "theta"])[dataset_key];
+
+def fetch_f2D_data_from_h5(filepath, dataset_key = "frvpar_passing"):
+
+	return fetch_data_from_h5(filepath, dimensions = ["zeta", "r", "vpar"])[dataset_key];
 
 def fetch_phi2D_filepaths(nominal_path):
 
@@ -53,3 +63,16 @@ def fetch_data_from_directory(nominal_path):
 		compiled_data.append(data);
 
 	return compiled_data;
+
+# Recall that we can source the names of individual datasets via HDFView or similar.
+def fetch_delta_t(directory_path):
+	
+	return fetch_data_from_h5(f"{directory_path}/sp0/Phi2D/Phi2D_d00000.h5")["deltat"].values;
+
+def fetch_phi2D_data(directory_path, dataset = "Phirth_n0"):
+
+	return compile_data_from_directory(dataset, f"{directory_path}/sp0/Phi2D");
+
+def fetch_f2D_data(directory_path, dataset = "frvpar_passing"):
+
+	return compile_data_from_directory(dataset, f"{directory_path}/sp0/f2D");

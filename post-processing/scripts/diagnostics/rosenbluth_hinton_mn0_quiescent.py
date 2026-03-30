@@ -2,7 +2,7 @@
 import numpy as np;
 import matplotlib.pyplot as plt;
 import IO_utilities as IO;
-import gysela_utilities as utils;
+import phi2D_utilities as utils;
 
 # Styling.
 plt.style.use("ggplot");
