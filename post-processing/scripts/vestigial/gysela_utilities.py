@@ -54,6 +54,64 @@ convenience_parameters = {
 # -------- Radial propagation/PSD & FFT helper functions. -----------
 # -------------------------------------------------------------------
 
+def calculate_physical_envelope_indices(damping_envelope, frequency, dt_diag, correlation_threshold = 0.95):
+	# TODO: this is very overengineered and will be of no use for a purely physical GAM signal (uncontaminated by Vlasov recurrence)
+	# Presuming no evolving background profile, this lets us skip the initial transients/positive growth rate phase.
+	nominal_start_index = np.argmax(damping_envelope);
+	# Convert from code units to diagnostic indices - not GYSELA time-steps!
+	diagnostic_period = int((1 / frequency) * (1 / dt_diag));
+	# Note always that time-steps are a visual abstraction.
+	# As a rule of thumb, the period we extract here MUST be half of the 'visual' period if dt_diag = 50, delta_t = 25.
+	start_index = None;
+	
+	for period_multiplier in np.arange(1, 7):
+
+		test_start = nominal_start_index + (period_multiplier * diagnostic_period);
+		# Look two periods ahead in index-space.
+		test_end = test_start + (2 * diagnostic_period);
+		test_segment = damping_envelope[test_start : test_end];
+
+		# Linearity test to find asymptotic regime.
+		log_segment = np.log(test_segment);
+		segment_range = np.arange(len(log_segment));
+		results = stats.linregress(segment_range, log_segment);
+		# The closer this is to 1, the more linearly correlated the points are.
+		pearson_correlation = results.rvalue ** 2;
+	
+		# We also omit here consecutive segments with a positive slope.
+		if pearson_correlation < correlation_threshold or results.slope >= 0:
+			continue;
+	
+		start_index = test_start;
+		break;
+	
+	if start_index is None:
+		print("Error: could not find asymptotic regime!");
+		return None;
+	
+	window_length = int(0.5 * diagnostic_period);
+
+	if window_length % 2 == 0:
+		# Window length must be odd.
+		window_length += 1;
+
+	# We cull the numerical jitters and noise via a Savitzky-Golay filter.
+	smoothed_envelope = signal.savgol_filter(damping_envelope, window_length, polyorder = 2);
+	long_time_signal = smoothed_envelope[start_index :];
+	consecutive_differences = np.diff(long_time_signal);
+	# Returns a tuple of arrays. We take the zeroth array.
+	turning_points = np.where(consecutive_differences > np.mean(damping_envelope) * 0.001)[0];
+	# Ordinarily we'd take `consecutive_differences > 0`, but this is too still too sensitive to small abrupt changes in the envelope.
+	# So here, we look at fluctuations ostensibly larger than noise.
+
+	# For the edge case where the GAM damps perfectly.
+	if len(turning_points) == 0:
+		return [start_index, len(damping_envelope) -1];
+
+	end_index = start_index + turning_points[0];
+	print(start_index, end_index)
+	return [start_index, end_index];
+
 def calculate_residual_level(damping_envelope, residual_window = 100, search_start_index = 100):
 
 	# Get time-index corresponding to first minimum, which should mark the end of the physical signal.
@@ -93,25 +151,31 @@ def extract_gam_frequency(phi2D_list, delta_t, effective_radius = 0.7, real_freq
 	return GAM_frequency;
 
 def extract_gam_growth_rate(phi2D_list, delta_t, dt_diag, frequency, effective_radius = 0.7, residual_window = 100, noise_threshold = 0.05):
-
+	# TODO: not as robust as the filtered method. needs revisions probably
 	radially_localised_time_series = generate_poloidally_averaged_time_series(phi2D_list, effective_radius);
 	stride = calculate_stride(delta_t, dt_diag);
 
 	envelope = generate_damping_envelope(radially_localised_time_series, frequency, dt_diag);
+	# Truncate to ignore starting transients and noise 'echo'/tail.
+	truncation_indices = calculate_physical_envelope_indices(envelope, frequency, dt_diag);
+
+	indices_range = np.arange(len(radially_localised_time_series));
+	truncation_mask = (indices_range >= truncation_indices[0]) & (indices_range <= truncation_indices[1]);
+	truncated_envelope = envelope[truncation_mask];
 	# Scale up to GYSELA time-steps, which matters strictly for the output value of the growth rate.
-	time_range = np.arange(len(radially_localised_time_series)) * stride;
+	time_range_masked = indices_range[truncation_mask] * stride;
 
 	# The residual level (should) behave as a static vertical offset. 
-	residual_level = calculate_residual_level(envelope, residual_window);
+	residual_level = calculate_residual_level(truncated_envelope, residual_window);
 	# By subtracting it from the envelope, we can isolate the pure decay signal.
-	pure_decay_signal = envelope - residual_level;
+	pure_decay_signal = truncated_envelope - residual_level;
 	# Take only positive signal values prior to the tail of the signal to ensure well-behaved logarithmic fitting.
 	mask = pure_decay_signal > (noise_threshold * np.max(pure_decay_signal));
 	# This signal was originally converted to real frequency units (Hz). Here, we keep code units.
 	log_signal = np.log(pure_decay_signal[mask]);
 
 	# Polyfit returns the slope and intercept as its first and second return values, respectively.
-	growth_rate, _ = np.polyfit(time_range, log_signal, 1);
+	growth_rate, _ = np.polyfit(time_range_masked, log_signal, 1);
 	return growth_rate;
 
 def extract_gam_growth_rate_filtered(phi2D_list, delta_t, dt_diag, frequency, effective_radius = 0.7, cutoff_frequencies = [0.0005, 0.0025]):
@@ -121,16 +185,22 @@ def extract_gam_growth_rate_filtered(phi2D_list, delta_t, dt_diag, frequency, ef
 	stride = calculate_stride(delta_t, dt_diag);
 
 	envelope = generate_damping_envelope(filtered_signal, frequency, dt_diag);
+	# Truncate to ignore starting transients and noise 'echo'/tail.
+	truncation_indices = calculate_physical_envelope_indices(envelope, frequency, dt_diag);
+
+	indices_range = np.arange(len(filtered_signal));
+	truncation_mask = (indices_range >= truncation_indices[0]) & (indices_range <= truncation_indices[1]);
+	truncated_envelope = envelope[truncation_mask];
 	# Scale up to GYSELA time-steps, which matters strictly for the output value of the growth rate.
-	time_range = np.arange(len(filtered_signal)) * stride;
+	time_range_masked = indices_range[truncation_mask] * stride;
 
 	# Mitigate cases where the band-pass produces an envelope that dips below the zero-line.
 	# This should not generally be possible but is kept as a safeguard.
-	log_signal = np.log(envelope[envelope > 0]);
-	time_range = time_range[envelope > 0];
+	log_signal = np.log(truncated_envelope[truncated_envelope > 0]);
+	time_range_masked = time_range_masked[truncated_envelope > 0];
 
 	# Polyfit returns the slope and intercept as its first and second return values, respectively.
-	growth_rate, _ = np.polyfit(time_range, log_signal, 1);
+	growth_rate, _ = np.polyfit(time_range_masked, log_signal, 1);
 	return growth_rate;
 
 def map_power_spectrum(radial_time_series, dt_diag, padding_factor = 5):

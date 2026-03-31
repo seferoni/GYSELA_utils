@@ -3,9 +3,9 @@ import xarray as xr;
 from pathlib import Path;
 
 # General utility functions.
-def compile_data_from_directory(data_key, nominal_path, to_numpy = False):
+def compile_data_from_directory(data_key, nominal_path, file_type, dimensions = None, to_numpy = False):
 
-	dataset_list = fetch_data_from_directory(nominal_path);
+	dataset_list = fetch_data_from_directory(nominal_path, file_type, dimensions);
 	
 	# The onus for input validation is on the user.
 	data_arrays = [dataset[data_key] for dataset in dataset_list];
@@ -36,7 +36,7 @@ def fetch_f2D_data_from_h5(filepath, dataset_key = "frvpar_passing"):
 
 	return fetch_data_from_h5(filepath, dimensions = ["zeta", "r", "vpar"])[dataset_key];
 
-def fetch_phi2D_filepaths(nominal_path):
+def fetch_filepaths(nominal_path, file_type):
 
 	directory_path = Path(nominal_path);
 
@@ -44,13 +44,13 @@ def fetch_phi2D_filepaths(nominal_path):
 		print(f"The given directory '{nominal_path}' could not be resolved.");
 		return [];
 
-	h5_files = [file.resolve() for file in directory_path.glob("Phi2D_d*.h5")];
+	h5_files = [file.resolve() for file in directory_path.glob(f"{file_type}_d*.h5")];
 	return sorted(h5_files);
 
-def fetch_data_from_directory(nominal_path):
+def fetch_data_from_directory(nominal_path, file_type, dimensions = None):
 	
 	compiled_data = [];
-	h5_files = fetch_phi2D_filepaths(nominal_path);
+	h5_files = fetch_filepaths(nominal_path, file_type);
 
 	if not h5_files:
 
@@ -59,7 +59,7 @@ def fetch_data_from_directory(nominal_path):
 
 	for h5_file in h5_files:
 
-		data = fetch_data_from_h5(h5_file);
+		data = fetch_data_from_h5(h5_file, dimensions);
 		compiled_data.append(data);
 
 	return compiled_data;
@@ -69,10 +69,10 @@ def fetch_delta_t(directory_path):
 	
 	return fetch_data_from_h5(f"{directory_path}/sp0/Phi2D/Phi2D_d00000.h5")["deltat"].values;
 
-def fetch_phi2D_data(directory_path, dataset = "Phirth_n0"):
+def fetch_phi2D_data(directory_path, dataset = "Phirth_n0", dimensions = ["zeta", "r", "theta"]):
 
-	return compile_data_from_directory(dataset, f"{directory_path}/sp0/Phi2D");
+	return compile_data_from_directory(dataset, f"{directory_path}/sp0/Phi2D", "Phi2D", dimensions);
 
-def fetch_f2D_data(directory_path, dataset = "frvpar_passing"):
+def fetch_f2D_data(directory_path, dataset = "frvpar_passing", dimensions = ["zeta", "r", "vpar"]):
 
-	return compile_data_from_directory(dataset, f"{directory_path}/sp0/f2D");
+	return compile_data_from_directory(dataset, f"{directory_path}/sp0/f2D", "f2D", dimensions);
