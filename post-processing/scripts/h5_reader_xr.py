@@ -3,9 +3,9 @@ import xarray as xr;
 from pathlib import Path;
 
 # General utility functions.
-def compile_data_from_directory(data_key, nominal_path, file_type, dimensions = None, to_numpy = False):
+def compile_data_from_directory(data_key, nominal_path, file_type, dimensions = None, file_limit = None, to_numpy = False):
 
-	dataset_list = fetch_data_from_directory(nominal_path, file_type, dimensions);
+	dataset_list = fetch_data_from_directory(nominal_path, file_type, dimensions, file_limit);
 	
 	# The onus for input validation is on the user.
 	data_arrays = [dataset[data_key] for dataset in dataset_list];
@@ -47,9 +47,10 @@ def fetch_filepaths(nominal_path, file_type):
 	h5_files = [file.resolve() for file in directory_path.glob(f"{file_type}_d*.h5")];
 	return sorted(h5_files);
 
-def fetch_data_from_directory(nominal_path, file_type, dimensions = None):
+def fetch_data_from_directory(nominal_path, file_type, dimensions = None, file_limit = None):
 	
 	compiled_data = [];
+	# By this point, h5_files is already sorted.
 	h5_files = fetch_filepaths(nominal_path, file_type);
 
 	if not h5_files:
@@ -57,11 +58,21 @@ def fetch_data_from_directory(nominal_path, file_type, dimensions = None):
 		print(f"No h5 files could be retrieved from {nominal_path}.");
 		return compiled_data;
 
+	print(f"Found {len(h5_files)} files in the directory. Beginning compilation...");
+
 	for h5_file in h5_files:
 
 		data = fetch_data_from_h5(h5_file, dimensions);
 		compiled_data.append(data);
 
+		if len(compiled_data) % 1000 == 0:
+			print(f"Compiled data from {len(compiled_data)} files...");
+	
+		if file_limit is not None and len(compiled_data) >= file_limit:
+			print(f"File limit of {file_limit} reached. Stopping compilation.");
+			break;
+	
+	print("Finished compiling data from all files in the directory.");
 	return compiled_data;
 
 # Recall that we can source the names of individual datasets via HDFView or similar.
@@ -69,10 +80,10 @@ def fetch_delta_t(directory_path):
 	
 	return fetch_data_from_h5(f"{directory_path}/sp0/Phi2D/Phi2D_d00000.h5")["deltat"].values;
 
-def fetch_phi2D_data(directory_path, dataset = "Phirth_n0", dimensions = ["zeta", "r", "theta"]):
+def fetch_phi2D_data(directory_path, dataset = "Phirth_n0", dimensions = ["zeta", "r", "theta"], file_limit = None):
 
-	return compile_data_from_directory(dataset, f"{directory_path}/sp0/Phi2D", "Phi2D", dimensions);
+	return compile_data_from_directory(dataset, f"{directory_path}/sp0/Phi2D", "Phi2D", dimensions, file_limit);
 
-def fetch_f2D_data(directory_path, dataset = "frvpar_passing", dimensions = ["zeta", "r", "vpar"]):
+def fetch_f2D_data(directory_path, dataset = "frvpar_passing", dimensions = ["zeta", "r", "vpar"], file_limit = None):
 
-	return compile_data_from_directory(dataset, f"{directory_path}/sp0/f2D", "f2D", dimensions);
+	return compile_data_from_directory(dataset, f"{directory_path}/sp0/f2D", "f2D", dimensions, file_limit);
