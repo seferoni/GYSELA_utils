@@ -123,7 +123,7 @@ remove_all_simulation_links_and_directories()
 {
 	pretty_print "Finding symbolic links for all simulation directories in the current folder..."
 	local simulation_links=()
-	mapfile -d '' simulation_links < <(find . -maxdepth 1 -type l -name 'DN_*' -print0)
+	mapfile -d '' simulation_links < <(find . -maxdepth 1 -type l -name 'DN_*' -not -name "*_DNR" -print0)
 	local link_count=${#simulation_links[@]}
 
 	if [[ $link_count -eq 0 ]]
