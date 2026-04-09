@@ -170,11 +170,10 @@ def generate_damping_envelope(radial_time_series, frequency, dt_diag):
 	envelope = interp1d(peak_indices, peaks, kind = "linear", bounds_error = False, fill_value = (peaks[0], peaks[-1]))(virtual_peak_times);
 	return envelope;
 
-def generate_time_range_by_series(radial_time_series, delta_t, dt_diag):
+def generate_time_range_by_series(radial_time_series, dt_diag):
 
 	naive_range = np.arange(len(radial_time_series));
-	stride = calculate_stride(delta_t, dt_diag);
-	return naive_range * stride;
+	return naive_range * dt_diag;
 
 def isolate_GAM_peak_index(power_spectrum_density, frequency_array, cutoff = 0.0005):
 
