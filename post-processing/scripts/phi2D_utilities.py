@@ -309,13 +309,13 @@ def generate_poloidally_averaged_time_series(phi2D_list, effective_radius = None
 def butterworth_band_pass_filter(time_series, dt_diag, low_cutoff = 0.0005, high_cutoff = 0.0025):
 
 	# Determine sampling rate and Nyquist frequency in normalised units.
-	# Note that cutoff frequencies also therefore becomes normalised...
+	# Note that cutoff frequencies also therefore become normalised...
 	sampling_rate = 1 / dt_diag;
 	nyquist_frequency = 0.5 * sampling_rate;
 	normalised_cutoff_frequencies = [low_cutoff / nyquist_frequency, high_cutoff / nyquist_frequency];
 
 	# Denominator and numerator of the impulse response filter, respectively.
-	# We choose here a fourth order high-pass filter.
+	# We choose here a fourth order band-pass filter.
 	b, a = signal.butter(N = 4, Wn = normalised_cutoff_frequencies, btype = "band");
 	filtered_signal = signal.filtfilt(b, a, time_series);
 	return filtered_signal;
