@@ -82,7 +82,9 @@ generate_exclusion_list()
 {
 	EXCLUSIONS=(
 		"--exclude=rst_files/"
-		"--exclude=conservation_laws/"
+		"--exclude=f2D/"
+		"--exclude=Phi2D/"
+		"--exclude=rprof/"
 		"--exclude=POPE/"
 		"--exclude=/mtm_trace/"
 		"--exclude=f5D/"
@@ -118,7 +120,7 @@ fi
 # Main script logic.
 if [[ $# -ne 2 ]]
 then
-	pretty_print "This is a script to copy simulation data folders while excluding restart data."
+	pretty_print "This is a script to copy simulation data folders, keeping only radial profile data."
 	echo "The target directory can be specified via the environment variable SMARTRSYNCPATH."
 	echo "Usage: ./smart_rsync.sh <simulation_directory> <target_directory>"
 	exit 1

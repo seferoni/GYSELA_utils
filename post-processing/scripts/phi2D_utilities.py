@@ -57,7 +57,7 @@ convenience_parameters = {
 def calculate_residual_level(damping_envelope, residual_window = 100, search_start_index = 100, use_heuristic_approach = False):
 
 	if use_heuristic_approach:
-		return np.mean(damping_envelope[-100:]);
+		return np.mean(damping_envelope[-residual_window:]);
 
 	# Get time-index corresponding to first minimum, which should mark the end of the physical signal.
 	end_index = np.argmin(damping_envelope[search_start_index :]);
