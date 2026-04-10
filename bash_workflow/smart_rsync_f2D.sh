@@ -87,7 +87,6 @@ generate_exclusion_list()
 		"--exclude=conservation_laws/"
 		"--exclude=POPE/"
 		"--exclude=/mtm_trace/"
-		"--exclude=init_state/"
 		"--exclude=f5D/"
 		"--exclude=fluxes3D/"
 		"--exclude=*.tmp"

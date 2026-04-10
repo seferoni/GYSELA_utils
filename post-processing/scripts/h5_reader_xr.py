@@ -17,16 +17,19 @@ def compile_data_from_directory(data_key, nominal_path, file_type, dimensions = 
 
 def fetch_data_from_h5(filepath, dimensions = None):
 
-	# If xarray complains (as it is often wont to do), changing the engine can help.
+	# If xarray complains (as it is often wont to do), changing the `engine` kwarg can help.
 	dataset = xr.open_dataset(filepath, engine = "h5netcdf", phony_dims = "sort");
 
-	if dimensions is not None:
-		# We match each `phony_dim` by comparing array sizes.
-		dataset = dataset.rename(phony_dim_0 = dimensions[0], phony_dim_1 = dimensions[1], phony_dim_2 = dimensions[2]).load();
+	if dimensions is None:
+		# Discard size-1 dimensions.
+		return dataset.load().squeeze();
 
-	# Discard size-1 dimensions.
-	dataset = dataset.squeeze();
-	return dataset;
+	for index, new_name in enumerate(dimensions):
+
+		phony_dimension_index = f"phony_dim_{index}"
+		dataset = dataset.rename({phony_dimension_index : new_name});
+
+	return dataset.load().squeeze();
 
 def fetch_phi2D_data_from_h5(filepath, dataset_key = "Phirth_n0"):
 
@@ -87,3 +90,7 @@ def fetch_phi2D_data(directory_path, dataset = "Phirth_n0", dimensions = ["zeta"
 def fetch_f2D_data(directory_path, dataset = "frvpar_passing", dimensions = ["zeta", "r", "vpar"], file_limit = None):
 
 	return compile_data_from_directory(dataset, f"{directory_path}/sp0/f2D", "f2D", dimensions, file_limit);
+
+def fetch_rprof_data(directory_path, dataset, dimensions = ["r"], file_limit = None):
+
+	return compile_data_from_directory(dataset, f"{directory_path}/sp0/rprof", "rprof_GC", dimensions, file_limit);
