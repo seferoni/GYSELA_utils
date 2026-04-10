@@ -94,3 +94,7 @@ def fetch_f2D_data(directory_path, dataset = "frvpar_passing", dimensions = ["ze
 def fetch_rprof_data(directory_path, dataset, dimensions = ["r"], file_limit = None):
 
 	return compile_data_from_directory(dataset, f"{directory_path}/sp0/rprof", "rprof_GC", dimensions, file_limit);
+
+def fetch_conservation_laws_data(directory_path, dataset, dimensions = None, file_limit = None):
+
+	return compile_data_from_directory(dataset, f"{directory_path}/sp0/conservation_laws", "conservation_laws", dimensions, file_limit);
