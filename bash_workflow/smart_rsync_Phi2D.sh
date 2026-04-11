@@ -47,7 +47,7 @@ copy_all_simulation_directories()
 	local remote_path="${NSCCPROJECTS#*:}"
 
 	local simulation_links=()
-	mapfile -d '' simulation_links < <(ssh "$remote_host" "find $remote_path -maxdepth 1 -type l -name 'DN_*' -not -name "*!!DNC*" -print0")
+	mapfile -d '' simulation_links < <(ssh "$remote_host" "find $remote_path -maxdepth 1 -type l -name 'DN_*' -not -name "*DNC*" -print0")
 	local link_count=${#simulation_links[@]}
 
 	if [[ $link_count -eq 0 ]]

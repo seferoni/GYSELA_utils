@@ -260,6 +260,20 @@ def parameter_scan_analysis_phi2D(base_directory, folder_prefix, dt_diag, effect
 # ------------------- Auxiliary methods. ----------------------------
 # -------------------------------------------------------------------
 
+def butterworth_band_pass_filter(time_series, dt_diag, low_cutoff = 0.0005, high_cutoff = 0.0025):
+
+	# Determine sampling rate and Nyquist frequency in normalised units.
+	# Note that cutoff frequencies also therefore become normalised...
+	sampling_rate = 1 / dt_diag;
+	nyquist_frequency = 0.5 * sampling_rate;
+	normalised_cutoff_frequencies = [low_cutoff / nyquist_frequency, high_cutoff / nyquist_frequency];
+
+	# Denominator and numerator of the impulse response filter, respectively.
+	# We choose here a fourth order band-pass filter.
+	b, a = signal.butter(N = 4, Wn = normalised_cutoff_frequencies, btype = "band");
+	filtered_signal = signal.filtfilt(b, a, time_series);
+	return filtered_signal;
+
 def isolate_m1_component(phi2D_xarray):
 
 	theta = np.linspace(0, 2 * np.pi, len(phi2D_xarray.theta));
@@ -286,16 +300,26 @@ def generate_poloidally_averaged_time_series(phi2D_list, effective_radius = None
 
 	return time_series;
 
-def butterworth_band_pass_filter(time_series, dt_diag, low_cutoff = 0.0005, high_cutoff = 0.0025):
+def generate_turbulent_variance_time_series(phi2D_list, effective_radius = None):
 
-	# Determine sampling rate and Nyquist frequency in normalised units.
-	# Note that cutoff frequencies also therefore become normalised...
-	sampling_rate = 1 / dt_diag;
-	nyquist_frequency = 0.5 * sampling_rate;
-	normalised_cutoff_frequencies = [low_cutoff / nyquist_frequency, high_cutoff / nyquist_frequency];
+	# Cull zonal component to extract turbulence intensity.
+	operation = lambda entry: ((entry - entry.mean(dim="theta")) ** 2).mean(dim="theta");
+	radial_strips = [operation(phi2D_xarray) for phi2D_xarray in phi2D_list];
+	variance_series = xr.concat(radial_strips, dim = "time");
 
-	# Denominator and numerator of the impulse response filter, respectively.
-	# We choose here a fourth order band-pass filter.
-	b, a = signal.butter(N = 4, Wn = normalised_cutoff_frequencies, btype = "band");
-	filtered_signal = signal.filtfilt(b, a, time_series);
-	return filtered_signal;
+	if not effective_radius is None:
+		variance_series = gys_utils.slice_at_effective_radius(variance_series, effective_radius);
+
+	return variance_series;
+
+def generate_zonal_variance_time_series(phi2D_list, effective_radius = None):
+
+	# Take a simple poloidal average and square to isolate zonal mode intensities.
+	operation = lambda entry: entry.mean(dim = "theta") ** 2;
+	radial_strips = [operation(phi2D_xarray) for phi2D_xarray in phi2D_list];
+	zonal_series = xr.concat(radial_strips, dim = "time");
+
+	if not effective_radius is None:
+		zonal_series = gys_utils.slice_at_effective_radius(zonal_series, effective_radius);
+
+	return zonal_series;
