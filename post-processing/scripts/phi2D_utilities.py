@@ -275,7 +275,7 @@ def butterworth_band_pass_filter(time_series, dt_diag, low_cutoff = 0.0005, high
 	return filtered_signal;
 
 def isolate_m1_component(phi2D_xarray):
-
+	# Note that this method is only applicable in circular geometry!
 	theta = np.linspace(0, 2 * np.pi, len(phi2D_xarray.theta));
 	
 	# Take note that the m = 1 can be isolated by projecting phi unto sin(theta).

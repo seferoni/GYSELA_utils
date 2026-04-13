@@ -31,14 +31,6 @@ def fetch_data_from_h5(filepath, dimensions = None):
 
 	return dataset.load().squeeze();
 
-def fetch_phi2D_data_from_h5(filepath, dataset_key = "Phirth_n0"):
-
-	return fetch_data_from_h5(filepath, dimensions = ["zeta", "r", "theta"])[dataset_key];
-
-def fetch_f2D_data_from_h5(filepath, dataset_key = "frvpar_passing"):
-
-	return fetch_data_from_h5(filepath, dimensions = ["zeta", "r", "vpar"])[dataset_key];
-
 def fetch_filepaths(nominal_path, file_type):
 
 	directory_path = Path(nominal_path);
