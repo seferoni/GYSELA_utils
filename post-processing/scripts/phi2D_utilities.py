@@ -274,6 +274,24 @@ def butterworth_band_pass_filter(time_series, dt_diag, low_cutoff = 0.0005, high
 	filtered_signal = signal.filtfilt(b, a, time_series);
 	return filtered_signal;
 
+def extract_fourier_modes(phi2D_list, modes_list):
+
+	time_series = xr.concat(phi2D_list, dim = "time");
+	n_theta = len(time_series.theta);
+	n_phi = len(time_series.phi);
+	# For a theta transform, we normalise by 1/n_theta. For a phi transform, we similarly normalise by 1/n_phi.
+	# When transforming in 2D, we normalise by the product of both mesh lengths.
+	mesh_normalisation = n_theta * n_phi;
+
+	amplitudes = {};
+	fourier_sum = np.fft.fft2(time_series.values) / mesh_normalisation;
+
+	for (m, n) in modes_list:
+
+		amplitudes[(m, n)] = np.abs(fourier_sum[:, m, n]);
+
+	return amplitudes;
+
 def isolate_m1_component(phi2D_xarray):
 	# Note that this method is only applicable in circular geometry!
 	theta = np.linspace(0, 2 * np.pi, len(phi2D_xarray.theta));
