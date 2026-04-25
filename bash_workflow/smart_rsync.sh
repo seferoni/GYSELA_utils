@@ -82,7 +82,6 @@ generate_exclusion_list()
 {
 	EXCLUSIONS=(
 		"--exclude=rst_files/"
-		"--exclude=conservation_laws/"
 		"--exclude=POPE/"
 		"--exclude=/mtm_trace/"
 		"--exclude=f5D/"
