@@ -202,7 +202,7 @@ def generate_xy_grid(phi2D_dataset):
 	
 	theta_coords_naive = normalise_theta(phi2D_dataset);
 	r_coords_naive = normalise_radius(phi2D_dataset);
-	theta_coords, r_coords = np.meshgrid(theta_coords_naive, r_coords_naive, indexing="ij");
+	theta_coords, r_coords = np.meshgrid(theta_coords_naive, r_coords_naive, indexing = "ij");
 	x = r_coords * np.cos(theta_coords);
 	y = r_coords * np.sin(theta_coords);
 	return x, y;
