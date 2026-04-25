@@ -18,12 +18,42 @@ def generate_time_range_by_series(radial_time_series, dt_diag):
 	naive_range = np.arange(len(radial_time_series));
 	return naive_range * dt_diag;
 
-def flux_surface_average_2D(quantity_xarray, jacobian_dictionary):
-	# TODO: untested
-	return (quantity_xarray * jacobian_dictionary["naive"]).sum(dim = ["theta"]) / jacobian_dictionary["intdtheta_Js"];
+def flux_surface_average_2D(quantity_xarray, jacobian_xr_dictionary, use_integrated_jacobian = False):
+	# The analytical formulation of a flux-surface average is the integral of the quantity over theta multiplied by the Jacobian, divided by the integral of the Jacobian over theta.
+	# `sum(dim = ["theta"])` provides the sum over A * Js, which is fine if the denominator is also the sum of Js over theta.
+	# HOWEVER, if the denominator is a proper integral, we are missing a factor of dtheta in the numerator, which is bad news bears.
+	n_theta = quantity_xarray.sizes["theta"];
+	naive_jacobian = jacobian_xr_dictionary["naive"];
+	jacobian_integrated_over_theta = jacobian_xr_dictionary["integrated_over_theta"];
+	dtheta_physical = (2 * np.pi) / n_theta;
 
-def flux_surface_average_3D(quantity_xarray, jacobian_dictionary):
-	# TODO: untested
-	return (quantity_xarray * jacobian_dictionary["naive"]).sum(dim = ["theta", "phi"]) / jacobian_dictionary["intdthetadphi_Js"];
+	numerator = (quantity_xarray * naive_jacobian).sum(dim = "theta");
+	denominator = naive_jacobian.sum(dim = "theta");
+
+	if use_integrated_jacobian:
+		# In general, you have no good reason to use this. You will not get unity for the flux surface average of 1, for example, which is pretty bad.
+		# You will inject radially-scaling errors into your calculations.
+		numerator = (quantity_xarray * naive_jacobian).sum(dim = "theta") * dtheta_physical;
+		denominator = jacobian_integrated_over_theta;
+
+	return numerator / denominator;
+
+def flux_surface_average_3D(quantity_xarray, jacobian_xr_dictionary, use_integrated_jacobian = False):
+	# See above.
+	n_theta = quantity_xarray.sizes["theta"];
+	naive_jacobian = jacobian_xr_dictionary["naive"];
+	jacobian_integrated_over_theta_and_phi = jacobian_xr_dictionary["integrated_over_theta_and_phi"];
+	dtheta_physical = (2 * np.pi) / n_theta;
+
+	numerator = (quantity_xarray * naive_jacobian).sum(dim = ["theta", "phi"]);
+	denominator = naive_jacobian.sum(dim = ["theta", "phi"]);
+
+	if use_integrated_jacobian:
+		# In general, you have no good reason to use this. You will not get unity for the flux surface average of 1, for example, which is pretty bad.
+		# You will inject radially-scaling errors into your calculations.
+		numerator = (quantity_xarray * naive_jacobian).sum(dim = ["theta", "phi"]) * dtheta_physical;
+		denominator = jacobian_integrated_over_theta_and_phi;
+
+	return numerator / denominator;
 
 # TODO: don't forget the radial averages

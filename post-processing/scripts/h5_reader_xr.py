@@ -89,15 +89,12 @@ def fetch_data_from_directory_parallelised(nominal_path, file_type, dimensions =
 # Recall that we can source the names of individual datasets via HDFView or similar.
 def fetch_jacobian(directory_path):
 	# TODO: untested
-	jacobian_dictionary = {};
-	naive_jacobian = fetch_data_from_h5(f"{directory_path}/sp0/init_state/magnet_config_r000.h5")["jacob_space"].values;
-	jacobian_integrated_over_theta = fetch_data_from_h5(f"{directory_path}/sp0/init_state/magnet_config_r000.h5")["intdtheta_Js"].values;
-	jacobian_integrated_over_theta_and_phi = fetch_data_from_h5(f"{directory_path}/sp0/init_state/magnet_config_r000.h5")["intdthetadphi_Js"].values;
-
-	jacobian_dictionary["naive"] = naive_jacobian;
-	jacobian_dictionary["integrated_over_theta"] = jacobian_integrated_over_theta;
-	jacobian_dictionary["integrated_over_theta_and_phi"] = jacobian_integrated_over_theta_and_phi;
-	return jacobian_dictionary;
+	dataset = fetch_data_from_h5(f"{directory_path}");
+	return {
+		"naive": dataset["jacob_space"].rename({"phony_dim_0": "theta", "phony_dim_1": "r"}),
+		"integrated_over_theta": dataset["intdtheta_Js"].rename({"phony_dim_1": "r"}),
+		"integrated_over_theta_and_phi": dataset["intdthetadphi_Js"].rename({"phony_dim_1": "r"}),
+	};
 
 def fetch_delta_t(directory_path):
 	
