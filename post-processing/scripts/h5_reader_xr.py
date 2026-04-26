@@ -14,10 +14,10 @@ def compile_data_from_directory(data_key, nominal_path, file_type, dimensions = 
 
 	return data_arrays;
 
-def fetch_data_from_h5(filepath, dimensions = None):
+def fetch_data_from_h5(filepath, dimensions = None, group = None):
 
 	# If xarray complains (as it is often wont to do), changing the `engine` kwarg can help.
-	dataset = xr.open_dataset(filepath, engine = "h5netcdf", phony_dims = "sort");
+	dataset = xr.open_dataset(filepath, engine = "h5netcdf", phony_dims = "sort", group = group);
 
 	if dimensions is None:
 		# Discard size-1 dimensions.
@@ -87,18 +87,22 @@ def fetch_data_from_directory_parallelised(nominal_path, file_type, dimensions =
 	return compiled_data;
 
 # Recall that we can source the names of individual datasets via HDFView or similar.
-def fetch_jacobian(directory_path):
-	# TODO: untested
-	dataset = fetch_data_from_h5(f"{directory_path}");
+def fetch_jacobian(directory_path, path_suffix = "sp0/init_state/magnet_config_r000.h5"):
+
+	dataset = fetch_data_from_h5(f"{directory_path}/{path_suffix}");
 	return {
 		"naive": dataset["jacob_space"].rename({"phony_dim_0": "theta", "phony_dim_1": "r"}),
 		"integrated_over_theta": dataset["intdtheta_Js"].rename({"phony_dim_1": "r"}),
 		"integrated_over_theta_and_phi": dataset["intdthetadphi_Js"].rename({"phony_dim_1": "r"}),
 	};
 
-def fetch_delta_t(directory_path):
-	
-	return fetch_data_from_h5(f"{directory_path}/sp0/Phi2D/Phi2D_d00000.h5")["deltat"].values;
+def fetch_dt_diag(directory_path, path_suffix = "sp0/init_state/data_r000.h5"):
+
+	return fetch_data_from_h5(f"{directory_path}/{path_suffix}", group = "DATA/ALGORITHM")["dt_diag"].values;
+
+def fetch_delta_t(directory_path, path_suffix = "sp0/Phi2D/Phi2D_d00000.h5"):
+
+	return fetch_data_from_h5(f"{directory_path}/{path_suffix}")["deltat"].values;
 
 def fetch_phi2D_data(directory_path, dataset = "Phirth_n0", dimensions = ["zeta", "r", "theta"], file_limit = None, parallelise = False):
 

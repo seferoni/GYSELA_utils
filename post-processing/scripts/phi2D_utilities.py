@@ -341,3 +341,15 @@ def generate_zonal_variance_time_series(phi2D_list, effective_radius = None):
 		zonal_series = gys_utils.slice_at_effective_radius(zonal_series, effective_radius);
 
 	return zonal_series;
+
+def generate_phi_dictionary(phi2D_dataset, jacobian_dictionary):
+
+	phi_FS_avg = gys_utils.flux_surface_average_2D(phi2D_dataset["Phirth"], jacobian_dictionary);
+	phi_rth_minus_phi_FS_avg = phi2D_dataset["Phirth"] - phi_FS_avg;
+	phi_rth_minus_phi_n0 = phi2D_dataset["Phirth"] - phi2D_dataset["Phirth_n0"];
+	return {
+		"broadband": {"data": phi2D_dataset["Phirth"], "title": r"Total Potential ($\Phi_{total}$)"},
+		"zonal": {"data": phi2D_dataset["Phirth_n0"], "title": r"Zonal Potential ($\Phi_{n=0}$)"},
+		"non-zonal": {"data": phi_rth_minus_phi_FS_avg, "title": r"Non-Zonal Potential ($\Phi_{total} - \Phi_{00}$)"},
+		"turbulence": {"data": phi_rth_minus_phi_n0, "title": r"Turbulence Potential ($\Phi_{total} - \Phi_{n=0}$)"}
+	};
