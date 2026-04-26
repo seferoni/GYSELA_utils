@@ -348,8 +348,8 @@ def generate_phi_dictionary(phi2D_dataset, jacobian_dictionary):
 	phi_rth_minus_phi_FS_avg = phi2D_dataset["Phirth"] - phi_FS_avg;
 	phi_rth_minus_phi_n0 = phi2D_dataset["Phirth"] - phi2D_dataset["Phirth_n0"];
 	return {
-		"broadband": {"data": phi2D_dataset["Phirth"], "title": r"Total Potential ($\Phi_{total}$)"},
+		"broadband": {"data": phi2D_dataset["Phirth"], "title": r"Total Potential ($\Phi$)"},
 		"zonal": {"data": phi2D_dataset["Phirth_n0"], "title": r"Zonal Potential ($\Phi_{n=0}$)"},
-		"non-zonal": {"data": phi_rth_minus_phi_FS_avg, "title": r"Non-Zonal Potential ($\Phi_{total} - \Phi_{00}$)"},
-		"turbulence": {"data": phi_rth_minus_phi_n0, "title": r"Turbulence Potential ($\Phi_{total} - \Phi_{n=0}$)"}
+		"non-zonal": {"data": phi_rth_minus_phi_FS_avg, "title": r"Non-zonal Potential ($\Phi - \Phi_{00}$)"},
+		"turbulence": {"data": phi_rth_minus_phi_n0, "title": r"Turbulence Potential ($\Phi - \Phi_{n=0}$)"}
 	};
