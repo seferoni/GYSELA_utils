@@ -303,11 +303,9 @@ def isolate_m1_component(phi2D_xarray):
 	phi_m1 = (phi2D_xarray * np.sin(theta)[:, None]).mean(dim = "theta");
 	return phi_m1;
 
-def generate_poloidally_averaged_time_series(phi2D_list, effective_radius = None, m1 = False):
+def generate_poloidally_averaged_time_series(phi2D_list, jacobian_dictionary = None, effective_radius = None, m1 = False):
 
-	# Poloidal averaging, equivalent in function to flux-surface averaging. This isolates the m = 0 zonal component.
-	# Intuitively speaking, this also 'folds' the circular geometry into one-dimensional radial strips.
-	operation = lambda entry : entry.mean(dim = "theta") if not m1 else isolate_m1_component(entry);
+	operation = lambda entry : gys_utils.flux_surface_average_2D(entry, jacobian_dictionary) if not m1 else isolate_m1_component(entry);
 	radial_strips = [operation(phi2D_xarray) for phi2D_xarray in phi2D_list];
 
 	# The following produces a two-dimensional x-array of shape (time, radial coordinate).
@@ -318,10 +316,10 @@ def generate_poloidally_averaged_time_series(phi2D_list, effective_radius = None
 
 	return time_series;
 
-def generate_turbulent_variance_time_series(phi2D_list, effective_radius = None):
+def generate_turbulent_variance_time_series(phi2D_list, jacobian_dictionary = None, effective_radius = None):
 
 	# Cull zonal component to extract turbulence intensity.
-	operation = lambda entry: ((entry - entry.mean(dim="theta")) ** 2).mean(dim="theta");
+	operation = lambda entry: ((entry - gys_utils.flux_surface_average_2D(entry, jacobian_dictionary)) ** 2).mean(dim="theta");
 	radial_strips = [operation(phi2D_xarray) for phi2D_xarray in phi2D_list];
 	variance_series = xr.concat(radial_strips, dim = "time");
 
@@ -330,10 +328,10 @@ def generate_turbulent_variance_time_series(phi2D_list, effective_radius = None)
 
 	return variance_series;
 
-def generate_zonal_variance_time_series(phi2D_list, effective_radius = None):
+def generate_zonal_variance_time_series(phi2D_list, jacobian_dictionary = None, effective_radius = None):
 
 	# Take a simple poloidal average and square to isolate zonal mode intensities.
-	operation = lambda entry: entry.mean(dim = "theta") ** 2;
+	operation = lambda entry: gys_utils.flux_surface_average_2D(entry, jacobian_dictionary) ** 2;
 	radial_strips = [operation(phi2D_xarray) for phi2D_xarray in phi2D_list];
 	zonal_series = xr.concat(radial_strips, dim = "time");
 
