@@ -294,6 +294,22 @@ def extract_fourier_modes(phi2D_list, modes_list):
 
 	return amplitudes;
 
+def find_gam_effective_radius(phi2D_list, jacobian_dictionary, quiescent_phi2D_list = None, skip_initial_fraction = 0.1):
+	# TODO: still needs work
+	fs_average_time_series = generate_poloidally_averaged_time_series(phi2D_list, jacobian_dictionary);
+
+	if quiescent_phi2D_list is not None:
+		fs_average_time_series_quiescent = generate_poloidally_averaged_time_series(quiescent_phi2D_list, jacobian_dictionary);
+		fs_average_time_series = fs_average_time_series - fs_average_time_series_quiescent;
+	
+	# Drop initial transient.
+	entries_skipped = int(skip_initial_fraction * fs_average_time_series.sizes["time"]);
+	fs_average_time_series = fs_average_time_series.isel(time = slice(entries_skipped, None));
+
+	oscillatory_signal = fs_average_time_series - fs_average_time_series.mean(dim = "time");
+	root_mean_square_at_all_r = np.array(np.sqrt((oscillatory_signal ** 2).mean(dim = "time")));
+	return np.argmax(root_mean_square_at_all_r) / len(root_mean_square_at_all_r);
+
 def isolate_m1_component(phi2D_xarray):
 	# Note that this method is only applicable in circular geometry!
 	theta = np.linspace(0, 2 * np.pi, len(phi2D_xarray.theta));
