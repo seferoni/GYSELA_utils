@@ -89,9 +89,9 @@ def extract_gam_frequency(phi2D_list, dt_diag, jacobian_dictionary, effective_ra
 	GAM_frequency = frequencies[GAM_peak_index];
 	return GAM_frequency;
 
-def extract_gam_growth_rate(phi2D_list, dt_diag, frequency, effective_radius = 0.7, residual_window = 100, noise_threshold = 0.05):
+def extract_gam_growth_rate(phi2D_list, dt_diag, jacobian_dictionary, frequency, effective_radius = 0.7, residual_window = 100, noise_threshold = 0.05):
 
-	time_series = generate_poloidally_averaged_time_series(phi2D_list, effective_radius);
+	time_series = generate_poloidally_averaged_time_series(phi2D_list, jacobian_dictionary, effective_radius);
 
 	envelope = generate_damping_envelope(time_series, frequency, dt_diag);
 	# Scale up to GYSELA time-steps, which matters strictly for the output value of the growth rate.
@@ -110,9 +110,9 @@ def extract_gam_growth_rate(phi2D_list, dt_diag, frequency, effective_radius = 0
 	growth_rate, _ = np.polyfit(time_range, log_signal, 1);
 	return growth_rate;
 
-def extract_gam_growth_rate_filtered(phi2D_list, dt_diag, frequency, effective_radius = 0.7, cutoff_frequencies = [0.0005, 0.0025]):
+def extract_gam_growth_rate_filtered(phi2D_list, dt_diag, jacobian_dictionary, frequency, effective_radius = 0.7, cutoff_frequencies = [0.0005, 0.0025]):
 
-	time_series = generate_poloidally_averaged_time_series(phi2D_list, effective_radius);
+	time_series = generate_poloidally_averaged_time_series(phi2D_list, jacobian_dictionary, effective_radius);
 	filtered_signal = butterworth_band_pass_filter(time_series, dt_diag, cutoff_frequencies[0], cutoff_frequencies[1]);
 
 	envelope = generate_damping_envelope(filtered_signal, frequency, dt_diag);
@@ -211,8 +211,8 @@ def generate_xy_grid(phi2D_dataset):
 # ------------------- Batch/parameter scan logic. -------------------
 # -------------------------------------------------------------------
 
-def parameter_scan_analysis_phi2D(base_directory, folder_prefix, dt_diag, effective_radius, cutoff_frequencies = None):
-	# TODO: this is inefficient
+def parameter_scan_analysis_phi2D(base_directory, folder_prefix, effective_radius, cutoff_frequencies = None):
+
 	# `folder_prefix` should be of the form "DN_*_*_[parameter value]" (DN is the standard GYSELA format, not necessarily invoked here).
 	search_pattern = os.path.join(base_directory, f"{folder_prefix}_*");
 	# Match search pattern, return list in ascending order.
@@ -235,15 +235,17 @@ def parameter_scan_analysis_phi2D(base_directory, folder_prefix, dt_diag, effect
 		print(f"Processing {folder_basename} with parameter value: {parameter_value}");
 	
 		# Load phi2D data.
-		phi2D_list = reader.fetch_phi2D_data(directory);
+		perturbed_phi2D_list = reader.fetch_phi2D_data(directory, parallelise = True);
+		jacobian_dictionary = reader.fetch_jacobian(directory);
+		dt_diag = reader.fetch_dt_diag(directory);
 	
 		# Process Phi2D data. We preserve GYSELA's normalisation convention (to the ion cyclotron frequency).
-		gam_frequency = extract_gam_frequency(phi2D_list, dt_diag, effective_radius);
+		gam_frequency = extract_gam_frequency(perturbed_phi2D_list, dt_diag, jacobian_dictionary, effective_radius);
 		
 		if cutoff_frequencies is not None:
-			gam_growth_rate = extract_gam_growth_rate_filtered(phi2D_list, dt_diag, gam_frequency, effective_radius, cutoff_frequencies);
+			gam_growth_rate = extract_gam_growth_rate_filtered(perturbed_phi2D_list, dt_diag, gam_frequency, effective_radius, cutoff_frequencies);
 		else:
-			gam_growth_rate = extract_gam_growth_rate(phi2D_list, dt_diag, effective_radius, gam_frequency);
+			gam_growth_rate = extract_gam_growth_rate(perturbed_phi2D_list, dt_diag, effective_radius, gam_frequency);
 	
 		# Store results as a table.
 		results.append({

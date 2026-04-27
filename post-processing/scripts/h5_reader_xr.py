@@ -9,9 +9,11 @@ def compile_data_from_directory(data_key, nominal_path, file_type, dimensions = 
 	operation = fetch_data_from_directory if not parallelise else fetch_data_from_directory_parallelised;
 	dataset_list = operation(nominal_path, file_type, dimensions, file_limit);
 	
+	if data_key is None:
+		return dataset_list;
+
 	# The onus for input validation is on the user.
 	data_arrays = [dataset[data_key] for dataset in dataset_list];
-
 	return data_arrays;
 
 def fetch_data_from_h5(filepath, dimensions = None, group = None):
