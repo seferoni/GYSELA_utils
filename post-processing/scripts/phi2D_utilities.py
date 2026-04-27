@@ -294,8 +294,8 @@ def extract_fourier_modes(phi2D_list, modes_list):
 
 	return amplitudes;
 
-def find_gam_effective_radius(phi2D_list, jacobian_dictionary, quiescent_phi2D_list = None, skip_initial_fraction = 0.1):
-	# TODO: still needs work
+def find_gam_effective_radius(phi2D_list, jacobian_dictionary, quiescent_phi2D_list = None, skip_initial_entries = 0.1, valid_bounds = [0.3, 0.7]):
+
 	fs_average_time_series = generate_poloidally_averaged_time_series(phi2D_list, jacobian_dictionary);
 
 	if quiescent_phi2D_list is not None:
@@ -303,11 +303,18 @@ def find_gam_effective_radius(phi2D_list, jacobian_dictionary, quiescent_phi2D_l
 		fs_average_time_series = fs_average_time_series - fs_average_time_series_quiescent;
 	
 	# Drop initial transient.
-	entries_skipped = int(skip_initial_fraction * fs_average_time_series.sizes["time"]);
+	entries_skipped = int(skip_initial_entries * fs_average_time_series.sizes["time"]);
 	fs_average_time_series = fs_average_time_series.isel(time = slice(entries_skipped, None));
 
 	oscillatory_signal = fs_average_time_series - fs_average_time_series.mean(dim = "time");
-	root_mean_square_at_all_r = np.array(np.sqrt((oscillatory_signal ** 2).mean(dim = "time")));
+	root_mean_square_at_all_r = np.sqrt((oscillatory_signal ** 2).mean(dim = "time"));
+
+	radial_coordinates = root_mean_square_at_all_r["r"].values;
+	r_min, r_max = radial_coordinates.min(), radial_coordinates.max();
+	r_span = r_max - r_min;
+	floor_offset, ceiling_offset = valid_bounds[0] * r_span, (1.0 - valid_bounds[1]) * r_span;
+
+	root_mean_square_at_all_r = np.array(root_mean_square_at_all_r.sel(r = slice(r_min + floor_offset, r_max - ceiling_offset)));
 	return np.argmax(root_mean_square_at_all_r) / len(root_mean_square_at_all_r);
 
 def isolate_m1_component(phi2D_xarray):
