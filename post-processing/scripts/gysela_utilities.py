@@ -49,11 +49,43 @@ def flux_surface_average_3D(quantity_xarray, jacobian_xr_dictionary, use_integra
 	denominator = naive_jacobian.sum(dim = ["theta", "phi"]);
 
 	if use_integrated_jacobian:
-		# In general, you have no good reason to use this. You will not get unity for the flux surface average of 1, for example, which is pretty bad.
-		# You will inject radially-scaling errors into your calculations.
+
 		numerator = (quantity_xarray * naive_jacobian).sum(dim = ["theta", "phi"]) * dtheta_physical;
 		denominator = jacobian_integrated_over_theta_and_phi;
 
 	return numerator / denominator;
 
 # TODO: don't forget the radial averages
+def radial_average_2D(quantity_xarray, jacobian_xr_dictionary, use_integrated_jacobian = False):
+	# See flux-surface average methods.
+	n_r = quantity_xarray.sizes["r"];
+	naive_jacobian = jacobian_xr_dictionary["naive"];
+	jacobian_integrated_over_r = jacobian_xr_dictionary["integrated_over_r"];
+	dr_physical = 1 / n_r;
+
+	numerator = (quantity_xarray * naive_jacobian).sum(dim = "r");
+	denominator = naive_jacobian.sum(dim = "r");
+
+	if use_integrated_jacobian:
+
+		numerator = (quantity_xarray * naive_jacobian).sum(dim = "r") * dr_physical;
+		denominator = jacobian_integrated_over_r;
+
+	return numerator / denominator;
+
+def radial_average_3D(quantity_xarray, jacobian_xr_dictionary, use_integrated_jacobian = False):
+	# See above.
+	n_r = quantity_xarray.sizes["r"];
+	naive_jacobian = jacobian_xr_dictionary["naive"];
+	jacobian_integrated_over_r_and_phi = jacobian_xr_dictionary["integrated_over_r_and_phi"];
+	dr_physical = 1 / n_r;
+
+	numerator = (quantity_xarray * naive_jacobian).sum(dim = ["r", "phi"]);
+	denominator = naive_jacobian.sum(dim = ["r", "phi"]);
+
+	if use_integrated_jacobian:
+
+		numerator = (quantity_xarray * naive_jacobian).sum(dim = ["r", "phi"]) * dr_physical;
+		denominator = jacobian_integrated_over_r_and_phi;
+
+	return numerator / denominator;
