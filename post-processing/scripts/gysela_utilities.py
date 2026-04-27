@@ -11,7 +11,7 @@ def slice_at_effective_radius(radial_time_series, effective_radius = 0.7):
 
 	total_radial_size = radial_time_series.sizes["r"] - 1;
 	radial_index = round(effective_radius * total_radial_size);
-	return radial_time_series[:, radial_index].values;
+	return radial_time_series[:, radial_index];
 
 def generate_time_range_by_series(radial_time_series, dt_diag):
 
@@ -55,37 +55,25 @@ def flux_surface_average_3D(quantity_xarray, jacobian_xr_dictionary, use_integra
 
 	return numerator / denominator;
 
-# TODO: don't forget the radial averages
-def radial_average_2D(quantity_xarray, jacobian_xr_dictionary, use_integrated_jacobian = False):
-	# See flux-surface average methods.
-	n_r = quantity_xarray.sizes["r"];
-	naive_jacobian = jacobian_xr_dictionary["naive"];
-	jacobian_integrated_over_r = jacobian_xr_dictionary["integrated_over_r"];
-	dr_physical = 1 / n_r;
+def radial_average_1D(quantity_xarray, jacobian_xr_dictionary):
+	# NB: quantity_xarray should be already flux-surface averaged.
+	naive_jacobian = jacobian_xr_dictionary["naive"]
+	# Cast the Jacobian in 'r' only.
+	radial_weight = naive_jacobian.sum(dim = "theta");
+	numerator = (quantity_xarray * radial_weight).sum(dim = "r");
+	denominator = radial_weight.sum(dim = "r");
+	return numerator / denominator;
 
+def radial_average_2D(quantity_xarray, jacobian_xr_dictionary):
+	# See flux-surface average methods.
+	naive_jacobian = jacobian_xr_dictionary["naive"];
 	numerator = (quantity_xarray * naive_jacobian).sum(dim = "r");
 	denominator = naive_jacobian.sum(dim = "r");
-
-	if use_integrated_jacobian:
-
-		numerator = (quantity_xarray * naive_jacobian).sum(dim = "r") * dr_physical;
-		denominator = jacobian_integrated_over_r;
-
 	return numerator / denominator;
 
 def radial_average_3D(quantity_xarray, jacobian_xr_dictionary, use_integrated_jacobian = False):
 	# See above.
-	n_r = quantity_xarray.sizes["r"];
 	naive_jacobian = jacobian_xr_dictionary["naive"];
-	jacobian_integrated_over_r_and_phi = jacobian_xr_dictionary["integrated_over_r_and_phi"];
-	dr_physical = 1 / n_r;
-
 	numerator = (quantity_xarray * naive_jacobian).sum(dim = ["r", "phi"]);
 	denominator = naive_jacobian.sum(dim = ["r", "phi"]);
-
-	if use_integrated_jacobian:
-
-		numerator = (quantity_xarray * naive_jacobian).sum(dim = ["r", "phi"]) * dr_physical;
-		denominator = jacobian_integrated_over_r_and_phi;
-
 	return numerator / denominator;
