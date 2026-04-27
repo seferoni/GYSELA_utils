@@ -104,7 +104,7 @@ def fetch_delta_t(directory_path, path_suffix = "sp0/Phi2D/Phi2D_d00000.h5"):
 
 	return fetch_data_from_h5(f"{directory_path}/{path_suffix}")["deltat"].values;
 
-def fetch_phi2D_data(directory_path, dataset = "Phirth_n0", dimensions = ["zeta", "r", "theta"], file_limit = None, parallelise = False):
+def fetch_phi2D_data(directory_path, dataset = "Phirth", dimensions = ["zeta", "r", "theta"], file_limit = None, parallelise = False):
 
 	return compile_data_from_directory(dataset, f"{directory_path}/sp0/Phi2D", "Phi2D", dimensions, file_limit, parallelise);
 
