@@ -129,7 +129,7 @@ def extract_gam_growth_rate_filtered(phi2D_list, dt_diag, jacobian_dictionary, f
 	return growth_rate;
 
 def map_power_spectrum(time_series, dt_diag, padding_factor = 5):
-
+	# NB: this returns f_GAM, not omega_GAM.
 	signal_steps = len(time_series);
 
 	# Isolate the GAM signal from the stationary ZF.
