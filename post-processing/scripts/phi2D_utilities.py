@@ -294,7 +294,7 @@ def extract_fourier_modes(phi2D_list, modes_list):
 
 	return amplitudes;
 
-def find_gam_effective_radius(phi2D_list, jacobian_dictionary, quiescent_phi2D_list = None, skip_initial_entries = 0.1, valid_bounds = [0.3, 0.7]):
+def find_gam_effective_radius_simple(phi2D_list, jacobian_dictionary, quiescent_phi2D_list = None, skip_initial_entries = 0.1, valid_bounds = [0.1, 0.9]):
 
 	fs_average_time_series = generate_poloidally_averaged_time_series(phi2D_list, jacobian_dictionary);
 
@@ -306,16 +306,19 @@ def find_gam_effective_radius(phi2D_list, jacobian_dictionary, quiescent_phi2D_l
 	entries_skipped = int(skip_initial_entries * fs_average_time_series.sizes["time"]);
 	fs_average_time_series = fs_average_time_series.isel(time = slice(entries_skipped, None));
 
+	# Isolate oscillatory signal.
 	oscillatory_signal = fs_average_time_series - fs_average_time_series.mean(dim = "time");
 	root_mean_square_at_all_r = np.sqrt((oscillatory_signal ** 2).mean(dim = "time"));
 
 	radial_coordinates = root_mean_square_at_all_r["r"].values;
 	r_min, r_max = radial_coordinates.min(), radial_coordinates.max();
 	r_span = r_max - r_min;
-	floor_offset, ceiling_offset = valid_bounds[0] * r_span, (1.0 - valid_bounds[1]) * r_span;
-
-	root_mean_square_at_all_r = np.array(root_mean_square_at_all_r.sel(r = slice(r_min + floor_offset, r_max - ceiling_offset)));
-	return np.argmax(root_mean_square_at_all_r) / len(root_mean_square_at_all_r);
+	floor, ceiling = r_min + (valid_bounds[0] * r_span), r_min + (valid_bounds[1] * r_span);
+	root_mean_square_at_all_r = root_mean_square_at_all_r.assign_coords(r = radial_coordinates);
+	root_mean_square_at_all_r = root_mean_square_at_all_r.sel(r = slice(floor, ceiling));
+	print(root_mean_square_at_all_r)
+	# NB: this presumes that rhomin = 0, rhomax = 1. Be careful!
+	return root_mean_square_at_all_r.idxmax().values / r_max;
 
 def isolate_m1_component(phi2D_xarray):
 	# Note that this method is only applicable in circular geometry!
