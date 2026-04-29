@@ -98,6 +98,14 @@ def fetch_jacobian(directory_path, path_suffix = "sp0/init_state/magnet_config_r
 		"integrated_over_theta_and_phi": dataset["intdthetadphi_Js"].rename({"phony_dim_1": "r"}),
 	};
 
+def fetch_safety_factor_flat(directory_path, path_suffix = "sp0/init_state/data_r000.h5"):
+
+	return fetch_data_from_h5(f"{directory_path}/{path_suffix}", group = "DATA/EQUIL")["q_param1"].values;
+
+def fetch_aspect_ratio(directory_path, path_suffix = "sp0/init_state/data_r000.h5"):
+
+	return fetch_data_from_h5(f"{directory_path}/{path_suffix}", group = "DATA/MESH")["aspect_ratio"].values;
+
 def fetch_dt_diag(directory_path, path_suffix = "sp0/init_state/data_r000.h5"):
 
 	return fetch_data_from_h5(f"{directory_path}/{path_suffix}", group = "DATA/ALGORITHM")["dt_diag"].values;

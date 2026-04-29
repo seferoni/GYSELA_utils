@@ -226,3 +226,4 @@ def plot_gam_damping(phi2D_list, dt_diag, jacobian_dictionary, GAM_frequency, ef
 	plt.legend(frameon = True, loc = "lower right");
 	plt.tight_layout();
 	plt.show();
+	return damping_rate;
