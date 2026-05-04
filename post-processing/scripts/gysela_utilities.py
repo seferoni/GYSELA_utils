@@ -8,23 +8,24 @@ import h5_reader_xr as reader;
 # -------- -------------------Generic. ------------------------------
 # -------------------------------------------------------------------
 
-def calculate_restart_indices(directory_path):
+def calculate_restart_times(directory_path):
 
 	delta_t = reader.fetch_delta_t(directory_path);
 	dt_diag = reader.fetch_dt_diag(directory_path);
 	restart_count = input_reader.fetch_parameter_value(directory_path, parameter = "NB_RESTART");
 	iterations_per_interval = input_reader.fetch_parameter_value(directory_path, parameter = "nbiter");
 
-	restart_indices = [];
+	restart_times = [];
 	time_per_interval = iterations_per_interval * delta_t;
 	diagnostic_iterations_per_interval = int(time_per_interval / dt_diag);
 
 	for restart_number in range(1, restart_count + 1):
 
 		restart_diagnostic_index = restart_number * diagnostic_iterations_per_interval;
-		restart_indices.append(restart_diagnostic_index);
+		restart_time = restart_diagnostic_index * dt_diag;
+		restart_times.append(restart_time);
 
-	return restart_indices;
+	return restart_times;
 
 def slice_at_effective_radius(radial_time_series, effective_radius = 0.7):
 
@@ -73,6 +74,14 @@ def flux_surface_average_3D(quantity_xarray, jacobian_xr_dictionary, use_integra
 		denominator = jacobian_integrated_over_theta_and_phi;
 
 	return numerator / denominator;
+
+def plot_restart_times(ax, restart_indices, colour = "black", line_style = "--", alpha = 0.3):
+
+	for array_index, restart_index in enumerate(restart_indices):
+
+		label = "Restarts" if array_index == 0 else None;
+		ax.axvline(x = restart_index, color = colour, linestyle = line_style, alpha = alpha, linewidth = 1.5, label = label);
+
 
 def radial_average_1D(quantity_xarray, jacobian_xr_dictionary):
 	# NB: quantity_xarray should be already flux-surface averaged.

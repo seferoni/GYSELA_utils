@@ -38,7 +38,7 @@ def fetch_parameter_value(directory_path, parameter):
 		if string_parts[0].strip() != parameter:
 			continue;
 		
-		print(f"Found line {line}, appears to be a match.");
+		print(f"Found line: \"{clean_line}\".");
 		print("Isolating value...");
 		value_string = string_parts[1].split("!")[0].strip();
 
