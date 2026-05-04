@@ -110,9 +110,9 @@ def fetch_dt_diag(directory_path, path_suffix = "sp0/init_state/data_r000.h5"):
 
 	return fetch_data_from_h5(f"{directory_path}/{path_suffix}", group = "DATA/ALGORITHM")["dt_diag"].values;
 
-def fetch_delta_t(directory_path, path_suffix = "sp0/Phi2D/Phi2D_d00000.h5"):
+def fetch_delta_t(directory_path, path_suffix = "sp0/init_state/data_r000.h5"):
 
-	return fetch_data_from_h5(f"{directory_path}/{path_suffix}")["deltat"].values;
+	return fetch_data_from_h5(f"{directory_path}/{path_suffix}", group = "DATA/ALGORITHM")["deltat"].values;
 
 def fetch_phi2D_data(directory_path, dataset = "Phirth", dimensions = ["zeta", "r", "theta"], file_limit = None, parallelise = False):
 

@@ -1,11 +1,30 @@
 # Imports.
 import numpy as np;
 import pandas as pd;
+import input_reader;
 import h5_reader_xr as reader;
 
 # -------------------------------------------------------------------
 # -------- -------------------Generic. ------------------------------
 # -------------------------------------------------------------------
+
+def calculate_restart_indices(directory_path):
+
+	delta_t = reader.fetch_delta_t(directory_path);
+	dt_diag = reader.fetch_dt_diag(directory_path);
+	restart_count = input_reader.fetch_parameter_value(directory_path, parameter = "NB_RESTART");
+	iterations_per_interval = input_reader.fetch_parameter_value(directory_path, parameter = "nbiter");
+
+	restart_indices = [];
+	time_per_interval = iterations_per_interval * delta_t;
+	diagnostic_iterations_per_interval = int(time_per_interval / dt_diag);
+
+	for restart_number in range(1, restart_count + 1):
+
+		restart_diagnostic_index = restart_number * diagnostic_iterations_per_interval;
+		restart_indices.append(restart_diagnostic_index);
+
+	return restart_indices;
 
 def slice_at_effective_radius(radial_time_series, effective_radius = 0.7):
 
