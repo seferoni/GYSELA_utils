@@ -262,7 +262,7 @@ def parameter_scan_analysis_phi2D(base_directory, folder_prefix, effective_radiu
 # ------------------- Auxiliary methods. ----------------------------
 # -------------------------------------------------------------------
 
-def butterworth_band_pass_filter(time_series, dt_diag, low_cutoff = 0.0005, high_cutoff = 0.0025):
+def butterworth_band_pass_filter(time_series, dt_diag, low_cutoff = 0.0005, high_cutoff = 0.0025, order = 4):
 
 	# Determine sampling rate and Nyquist frequency in normalised units.
 	# Note that cutoff frequencies also therefore become normalised...
@@ -272,7 +272,7 @@ def butterworth_band_pass_filter(time_series, dt_diag, low_cutoff = 0.0005, high
 
 	# Denominator and numerator of the impulse response filter, respectively.
 	# We choose here a fourth order band-pass filter.
-	b, a = signal.butter(N = 4, Wn = normalised_cutoff_frequencies, btype = "band");
+	b, a = signal.butter(N = order, Wn = normalised_cutoff_frequencies, btype = "band");
 	filtered_signal = signal.filtfilt(b, a, time_series);
 	return filtered_signal;
 
